@@ -1,0 +1,47 @@
+name: Windows release
+on:
+  push:
+    branches: [main]
+    paths: ["src/**", "packaging/**", ".github/workflows/release.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: x64
+      - name: Install build dependencies
+        run: python -m pip install PyInstaller==6.22.3 Pillow==13.0.0 numpy==2.3.5 dxcam==0.3.0 comtypes==1.5.0 PyAudioWPatch==0.2.12.9
+      - name: Build application
+        run: >
+          python -m PyInstaller --noconfirm --windowed --onedir --paths .
+          --name ThotClip --icon src/assets/thotclip.ico --add-data "src/assets;src/assets" --add-data "src/kill_sources/kill_suffix.png;src/kill_sources" --collect-all dxcam --collect-all pyaudiowpatch
+          --add-data "src/kill_sources/feed_me.png;src/kill_sources"
+          --add-data "src/kill_sources/switch_player.png;src/kill_sources"
+          packaging/launcher.py
+      - name: Package and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release download build-0 -p ThotClip-Setup-x64.exe -D "$env:RUNNER_TEMP"
+          if ($LASTEXITCODE) { throw "Missing build-0 bootstrap release" }
+          $setup = Join-Path $env:RUNNER_TEMP ThotClip-Setup-x64.exe
+          if ((Get-FileHash $setup).Hash -ne '1F4A851A3F540F7A0FD343A7E25C39D2C23749170E305C7B0182BC48DA1E02CD') { throw "Media runtime checksum mismatch" }
+          $dest = Join-Path $env:RUNNER_TEMP runtime
+          $result = Start-Process $setup -ArgumentList "/extract `"$dest`"" -Wait -PassThru
+          if ($result.ExitCode) { throw "Media extraction failed" }
+          $media = Join-Path (Get-ChildItem $dest -Directory | Select-Object -First 1).FullName tools
+          @{repository=$env:GITHUB_REPOSITORY;build=[long]$env:GITHUB_RUN_NUMBER} | ConvertTo-Json | Set-Content dist/ThotClip/release.json -Encoding utf8NoBOM
+          python packaging/bundle.py dist/ThotClip "$media/ffmpeg.exe" "$media/ffprobe.exe" "$media/ffplay.exe" "$media/vlc" release/ThotClip-Setup-x64.exe
+          if ($LASTEXITCODE) { throw "Packaging failed" }
+          gh release create "build-$env:GITHUB_RUN_NUMBER" release/ThotClip-Setup-x64.exe --title "Thot Clip build $env:GITHUB_RUN_NUMBER" --target "$env:GITHUB_SHA" --generate-notes --latest
+

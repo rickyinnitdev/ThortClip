@@ -1,0 +1,11 @@
+# Share application sources. Local recordings, credentials, builds and evidence stay local.
+/*
+!/.gitignore
+!/.github/
+!/packaging/
+!/src/
+!/README.md
+!/run.bat
+!/test_*.py
+__pycache__/
+*.pyc

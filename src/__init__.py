@@ -1,0 +1,1 @@
+# MedalRea Lightweight Clipper
