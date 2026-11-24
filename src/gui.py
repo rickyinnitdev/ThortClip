@@ -108,9 +108,9 @@ class RecorderWindow:
 
         self.checking_update = False
         self.manual_update = False
+        self.pending_update = None
         self.build_interface("library")
         root.protocol("WM_DELETE_WINDOW", self.close)
-        self.pending_update = None
         self.refresh()
         if os.environ.get("MEDALREA_BUNDLE_TOOLS"):
             self.root.after(2500, self.check_update)
@@ -225,7 +225,8 @@ class RecorderWindow:
             self.nav_buttons[key] = btn
 
         self.check_button = RoundedButton(
-            self.sidebar, text="Check for update", command=lambda: self.check_update(manual=True),
+            self.sidebar, text="Restart to update" if self.pending_update else "Check for update",
+            command=lambda: self.restart_for_update() if self.pending_update else self.check_update(manual=True),
             fg=palette.TEXT, bg=palette.CARD_BG, activebackground=palette.CARD_HOVER,
             activeforeground=palette.TEXT, font=("Segoe UI", 9, "bold"),
         )
@@ -1508,9 +1509,6 @@ class RecorderWindow:
         self._card_widgets = []
         self._thumb_canvases = {}
         self.last_state = None
-        if hasattr(self, "update_button"):
-            del self.update_button
-            self.events.put(("update_ready", self.pending_update))
         self.build_interface("settings")
 
     def browse_folder(self):
@@ -1637,11 +1635,7 @@ class RecorderWindow:
                     self.events.put(("update_ready", item[1]))
             elif event_type == "update_ready":
                 self.pending_update = item[1]
-                if not hasattr(self, "update_button"):
-                    self.update_button = RoundedButton(self.topbar, text="Restart to update", font=("Segoe UI", 9),
-                        fg=palette.TEXT, bg=palette.CARD_BG, activeforeground=palette.TEXT, activebackground=palette.CARD_HOVER,
-                        command=self.restart_for_update)
-                    self.update_button.pack(side="right", padx=8)
+                self.check_button.configure(text="Restart to update", state="normal")
             elif event_type == "action_done":
                 self.notice = item[1]
                 self.busy = False
@@ -1703,10 +1697,6 @@ class RecorderWindow:
         recording = self.app.recorder.is_recording()
         playback = self.app.recorder.playback
         mic_warning = playback.mic_warning if playback and recording else ""
-        if self.pending_update:
-            blocked = (recording or self.busy or self.app.log_watcher.in_match
-                       or str(self.clip_player.btn_save_edits.cget("state")) == "disabled")
-            self.update_button.configure(state="disabled" if blocked else "normal")
         in_match = self.app.log_watcher.in_match
         log_status = self.app.log_watcher.log_status
         state = recording, in_match, log_status, self.notice, self.app.results.status, mic_warning
@@ -1801,10 +1791,13 @@ class RecorderWindow:
         threading.Thread(target=work, daemon=True).start()
 
     def restart_for_update(self):
-        if self.busy or self.app.recorder.is_recording() or self.app.log_watcher.in_match:
+        if self.busy or str(self.clip_player.btn_save_edits.cget("state")) == "disabled":
+            messagebox.showinfo("Restart to update", "An action is in progress. Try again when it finishes.", parent=self.root)
             return
-        if str(self.clip_player.btn_save_edits.cget("state")) == "disabled":
-            return
+        if self.app.recorder.is_recording():
+            if not messagebox.askyesno("Restart to update",
+                    "Stop recording and restart ThortClip now? Capture will pause during the update.", parent=self.root):
+                return
         try:
             subprocess.Popen([str(self.pending_update), "/update", str(os.getpid())],
                              creationflags=subprocess.CREATE_BREAKAWAY_FROM_JOB)
