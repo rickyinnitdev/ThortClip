@@ -1,4 +1,4 @@
-import os
+import subprocess
 import re
 import time
 import threading
@@ -46,36 +46,64 @@ class LogWatcher:
 
     def _watch_loop(self):
         print(f"[LogWatcher] Monitoring log: {self.log_path}")
-        last_size = 0
-
+        identity = None
+        initial = True
         while self._running:
-            if not self.log_path.exists():
-                time.sleep(2.0)
-                continue
-
             try:
-                cur_size = self.log_path.stat().st_size
-                # If file rotated or truncated, reset position
-                if cur_size < last_size:
+                stat = self.log_path.stat()
+                file_id = (stat.st_dev, stat.st_ino)
+                if self._file_handle is None or identity != file_id or stat.st_size < self._file_handle.tell():
                     if self._file_handle:
                         self._file_handle.close()
-                    self._file_handle = open(self.log_path, "r", encoding="utf-8", errors="ignore")
-                    last_size = 0
+                    self._file_handle = self.log_path.open(encoding="utf-8", errors="ignore")
+                    identity = file_id
+                    if initial:
+                        initial = False
+                        self._restore_session(stat.st_size)
+                    elif self.in_match:
+                        self.in_match = False
+                        self.match_id = None
+                        self.current_round = 0
+                        if self.on_match_ended:
+                            self.on_match_ended()
 
-                if self._file_handle is None:
-                    self._file_handle = open(self.log_path, "r", encoding="utf-8", errors="ignore")
-                    # Start at the end of the file so we don't replay old matches
-                    self._file_handle.seek(0, os.SEEK_END)
-                    last_size = cur_size
-
-                line = self._file_handle.readline()
-                if line:
-                    last_size = self._file_handle.tell()
+                while self._running:
+                    line = self._file_handle.readline()
+                    if not line:
+                        break
                     self._process_line(line.strip())
-                else:
-                    time.sleep(0.2)
-            except Exception as e:
-                time.sleep(1.0)
+                time.sleep(0.2)
+            except FileNotFoundError:
+                initial = False
+                time.sleep(1)
+            except Exception as error:
+                if self._running:
+                    print(f"[LogWatcher] {error}")
+                time.sleep(1)
+
+    def _restore_session(self, initial_size):
+        # An abandoned log can end mid-round after a crash. Only restore it
+        # when the actual game process is present, including when minimized.
+        try:
+            result = subprocess.run(
+                ["tasklist.exe", "/FI", "IMAGENAME eq VALORANT-Win64-Shipping.exe", "/FO", "CSV", "/NH"],
+                capture_output=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            running = b'"valorant-win64-shipping.exe"' in result.stdout.lower()
+        except (OSError, subprocess.TimeoutExpired):
+            running = False
+        if not running:
+            self._file_handle.seek(initial_size)
+            return
+        # Reconstruct state without dispatching historical clips or round ends.
+        history = LogWatcher(self.log_path)
+        for line in self._file_handle:
+            history._process_line(line)
+        self.match_id = history.match_id
+        self.in_match = history.in_match
+        self.current_round = history.current_round
+        if self.in_match and self.on_match_detected:
+            self.on_match_detected()
 
     def _process_line(self, line: str):
         if not line:

@@ -993,7 +993,7 @@ class RecorderWindow:
         # Crosshair / HUD hint
         c.create_line(pw // 2 - 15, ph // 2, pw // 2 + 15, ph // 2, fill="#1c2432", width=1)
         c.create_line(pw // 2, ph // 2 - 15, pw // 2, ph // 2 + 15, fill="#1c2432", width=1)
-        c.create_text(pw // 2, ph // 2 + 25, text="GAMEPLAY (1568 × 1080)", font=("Segoe UI", 9, "bold"), fill="#C1BDAD")
+        c.create_text(pw // 2, ph // 2 + 25, text=f"GAMEPLAY ({self.app.config.resolution.replace('x', ' × ')})", font=("Segoe UI", 9, "bold"), fill="#C1BDAD")
 
         # Top-right killfeed simulation
         c.create_rectangle(pw - 120, 15, pw - 15, 35, fill="#EFE4CF", outline="#544F48")
@@ -1685,7 +1685,8 @@ class RecorderWindow:
             blocked = (recording or self.busy or self.app.log_watcher.in_match
                        or str(self.clip_player.btn_save_edits.cget("state")) == "disabled")
             self.update_button.configure(state="disabled" if blocked else "normal")
-        state = recording, self.notice, self.app.results.status, mic_warning
+        in_match = self.app.log_watcher.in_match
+        state = recording, in_match, self.notice, self.app.results.status, mic_warning
 
         if state != self.last_state:
             # Update Topbar Status Pill and Action Buttons
@@ -1700,7 +1701,7 @@ class RecorderWindow:
                     self.top_btn_stop.pack(side="left")
             else:
                 self.status_canvas.itemconfigure(self.status_dot, fill=palette.MUTED)
-                self.status_text.configure(text="Waiting For Game", fg=palette.MUTED)
+                self.status_text.configure(text="Match detected · recorder idle" if in_match else "Waiting for match", fg=palette.MUTED)
                 if hasattr(self, "top_btn_save"):
                     self.top_btn_save.pack_forget()
                 if hasattr(self, "top_btn_stop"):
