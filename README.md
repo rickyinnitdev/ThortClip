@@ -1,126 +1,44 @@
 # ThortClip
 
-ThortClip saves local Valorant highlights on Windows. The installer includes the recorder, player, and media tools. Press **F8** for a manual clip, or let the kill-feed detector save personal highlights by round.
+ThortClip is a local VALORANT highlight recorder for Windows x64. It reads the kill feed and saves one MP4 per round where it detects your kills, from the first kill through the last. Rounds with zero detected personal kills produce zero automatic clips. Press **F8** during recording to save a play manually. Automatic clipping works without a Riot account connection or API key.
 
-[Download the latest Windows x64 installer](https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe) · [GitHub Packages](https://github.com/rickyinnitdev/ThortClip/packages)
+**[Download ThortClip for Windows x64](https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe)** · [All releases](https://github.com/rickyinnitdev/ThortClip/releases) · [GitHub Packages](https://github.com/rickyinnitdev/ThortClip/packages)
+
+## Record your first clip
+
+1. Run **ThortClip-Setup-x64.exe** and open **ThortClip** from the Start menu. The installer includes Python, FFmpeg, and the media player.
+2. Leave the app open and enter a match. **Capture Status** shows when recording is active. You can also choose **Start recording** to try it before a match.
+3. Press **F8** during recording, or finish a round with a personal kill. Open **Clips Library** to play the highlight. Click a kill marker to jump to that moment, or choose **Open clip in folder** to select the MP4 in Explorer.
+
+On a fresh install, clips are saved under **Videos → ThortClip**. Check **Settings → Clips Output Directory** for the actual location, especially after upgrading from an earlier version.
+
+## Make it yours
+
+| What you want | Where to find it |
+| --- | --- |
+| Record game sound and your voice | In **Audio Settings**, choose the playback and microphone devices, enable the inputs you want, and adjust their levels. |
+| Include a webcam | In **Video Overlays**, select a camera and click **Start live preview**. Drag or resize the box, then enable the overlay for recordings. |
+| Include the end of a round | In **Capture Status**, enable **Include round ending in kill clips**. This extends a highlight that already contains a kill. |
+| Match a stretched game resolution | In **Settings**, enable **Fill widescreen clips (16:9)** for new exports. Turn it off to keep the capture’s original aspect ratio. |
+| Switch to a dark interface | Toggle **Dark mode** in **Settings**. ThortClip remembers your choice. |
+| Find multi-kills or trim a clip | Choose **Multi-kills** in **Clips Library**. Open a clip, drag the trim handles, and choose **Save Edits** to save a separate copy. |
+
+## Capture and updates
+
+On first launch, the installer-created profile uses the primary display resolution and tests NVIDIA, AMD, and Intel H.264 encoders. If a hardware test succeeds, the profile uses 60 FPS. The software fallback uses 30 FPS.
+
+The recorder keeps a rolling buffer of short segments. Standard highlights use stream copy; adding a webcam overlay requires video re-encoding. The detector looks for the local attacker and checks the spectator HUD to avoid crediting a teammate’s kill.
+
+The installed app checks GitHub Releases on launch and every four hours. When a newer installer has downloaded and passed its checksum check, **Restart to update** appears in the top bar. Restart is available between matches after recording and clip saves finish. Source checkouts launched with `run.bat` use Git for updates.
+
+## Development
+
+The desktop interface is in [src/gui.py](src/gui.py), capture and round handling in [src/main.py](src/main.py), and the local kill-feed detector in [src/kill_sources/screen_detector.py](src/kill_sources/screen_detector.py). The [Windows release workflow](.github/workflows/release.yml) specifies the build dependencies and packages the installer.
+
+The installed profile lives at `%LOCALAPPDATA%\MedalRea\profile\config.json`. The legacy folder name preserves settings across upgrades. A source checkout uses a local `config.json` in the repository root. For recorder tests, use an isolated configuration and temporary output folders; starting capture can clear the configured segment directory.
+
+For authorized post-match results, configure `MEDALREA_RIOT_API_KEY`, `MEDALREA_PLAYER_PUUID`, and `MEDALREA_VAL_REGION` for the approved application and opted-in player. With that integration enabled, pending match recordings are retained while the app waits for results.
 
 ## License
 
-Copyright 2026 Morm Kimheng (rickyinnitdev). ThortClip’s own source code is licensed under the GNU General Public License, version 3 only (SPDX identifier `GPL-3.0-only`). Bundled third-party components retain their respective licenses. [Full license](LICENSE)
-
-## Current Windows profile
-
-Launch `run.bat` for the recorder window. The configured profile uses Windows Graphics Capture and NVIDIA HEVC at 1568×1080, 60 FPS, and 24 Mb/s, with Windows playback captured as stereo AAC on the configured PC. The capture backend uses the FFmpeg 9.1 executable in `%LOCALAPPDATA%/MedalRea/tools`, or a compatible FFmpeg on PATH. The screen detector reads the full-resolution local attacker entry in the top-right kill feed. Automatic clips span the first through the last personal kill of each round. The optional round-ending setting extends only rounds that have kills.
-
-For an authorized VAL-MATCH-V1 integration, supply the approved application's API key through `MEDALREA_RIOT_API_KEY`, the opted-in player's PUUID through `MEDALREA_PLAYER_PUUID`, and the VAL regional route through `MEDALREA_VAL_REGION`. With these configured, an identified match is retained in `temp/pending-matches` and exported after Riot returns completed results. Unavailable results are retried while the app is open. Pending recordings use approximately 10.9 GB per hour at this profile. With no credentials configured, the recorder uses its bounded rolling buffer and local kill-feed detection.
-
-A clean, high-performance game recorder and auto-clipper designed with a modular architecture:
-- **2-second MPEG-TS segments (`.ts`)**: Rolling buffer with automatic pruning. Eliminates file lock contention and MP4 container corruption.
-- **Instant Lossless Slicing**: Uses FFmpeg stream copy (`-c copy`) via concat demuxer (<50ms). Zero re-encoding.
-- **Passive Log Watcher**: Tails `%LOCALAPPDATA%\VALORANT\Saved\Logs\ShooterGame.log` for round bounds.
-- **Screen Detector**: Recognizes the highlighted local attacker in the top-right kill feed.
-- **Manual Hotkey**: Global `F8` key fallback via native Windows Win32 API.
-- **Offline Detector Test Tool**: Test screenshots and tune HSV thresholds offline before playing.
-
----
-
-## Architecture
-
-```
-                                  +----------------------+
-                                  |    Valorant Game     |
-                                  +-----------+----------+
-                                              |
-                     +------------------------+------------------------+
-                     | Writes Logs                                     | Renders Screen
-                     v                                                 v
-           +--------------------+                            +--------------------+
-           |     LogWatcher     |                            |   ScreenDetector   |
-           | (ShooterGame.log)  |                            | (Local kill feed)  |
-           +---------+----------+                            +---------+----------+
-                     | Active Round                                    | Kill Event Trigger
-                     v                                                 v
-  +-------------------------------------------------------------------------------+
-  |                                  ThortClip                                    |
-  |  - ScreenRecorder: FFmpeg -> 2s .ts rolling buffer (auto-pruned to 120s)      |
-  |  - Hotkey Source: [F8] global key fallback                                    |
-  |  - VideoCutter: Concat completed .ts segments with -c copy -> clean .mp4      |
-  +---------------------------------------+---------------------------------------+
-                                          |
-                                          v
-                               [clips/Clip_RoundX_*.mp4]
-```
-
----
-
-## Quick Start
-
-### 1. Run the Auto-Clipper
-Double-click `run.bat` or run:
-```powershell
-python -m src.main
-```
-*Note: Run `run.bat` directly from your interactive Windows desktop so FFmpeg has permission to access the display.*
-
-### 2. Test the Screen Detector Offline
-To test detection on any screenshot of your kill banner:
-```powershell
-python test_detector.py path\to\your_kill_screenshot.png
-```
-Or drag and drop the screenshot directly onto `test_detector.bat`.
-This generates visual debug files in `debug_output/`:
-- `annotated_<filename>`: Shows the green/red ROI bounding box.
-- `mask_<filename>`: Shows the exact matched yellow pixels.
-
----
-
-## Configuration (`config.json`)
-
-```json
-{
-  "recorder": {
-    "encoder": "auto",              // "auto", "h264_nvenc" (NVIDIA), "h264_amf" (AMD), "h264_qsv" (Intel), or "libx264"
-    "resolution": "1280x720",       // 720p or 1080p
-    "fps": 60,
-    "bitrate": "8M",
-    "buffer_duration_sec": 120,     // Total rolling buffer window (auto-pruned)
-    "clip_duration_before_sec": 20, // Lead-in time before the kill/hotkey
-    "clip_duration_after_sec": 5,   // Lead-out time after the kill/hotkey
-    "audio_device": "none"          // DirectShow audio input device or "none"
-  },
-  "detector": {
-    "enabled": true,
-    "poll_fps": 15,                 // Checks 15 times/sec (< 0.5% CPU)
-    "target_color": "yellow",
-    "yellow_hsv_min": [35, 100, 120],
-    "yellow_hsv_max": [65, 255, 255],
-    "min_matching_pixels": 80,      // Minimum yellow pixels to trigger kill
-    "cooldown_sec": 1.5,            // Prevent duplicate clips from same kill
-    "roi_percent": {
-      "x_min": 0.40, "x_max": 0.60,
-      "y_min": 0.74, "y_max": 0.88
-    }
-  },
-  "hotkey": {
-    "enabled": true,
-    "key": "F8"
-  },
-  "overlay": {
-    "enabled": false,               // Toggle webcam overlay on/off
-    "device": "USB2.0 HD UVC WebCam", // USB webcam or virtual camera device
-    "virtual_camera_enabled": false, // Include OBS Virtual Camera in choices
-    "position": "bottom-right",     // "top-left", "top-right", "bottom-left", "bottom-right", "center", or "custom"
-    "x_percent": 80.0,              // Horizontal position percentage
-    "y_percent": 72.0,              // Vertical position percentage
-    "width_percent": 20.0,          // Webcam width percentage
-    "height_percent": 25.0,         // Webcam height percentage
-    "size_preset": "medium"         // "small", "medium", "large", or "custom"
-  }
-}
-```
-
-## Features
-- **ThortClip desktop interface**: Sleek dark gaming dashboard with Clips Library grid, Video Overlays screen, Capture Status monitor, and PC Storage indicator.
-- **Webcam Video Overlay**: Capture USB webcams and virtual cameras (OBS). Drag-and-drop webcam positioning on an interactive 16:9 preview canvas, custom scale adjustment (10%–45%), and corner presets.
-- **Zero Game FPS Impact**: Lightweight Tkinter/Python architecture (<40 MB RAM, 0% CPU on standby). Screen capture runs hardware-accelerated directly in GPU VRAM without pipeline contention.
-
+Copyright 2026 Morm Kimheng (rickyinnitdev). ThortClip’s own source code is licensed under **GPL-3.0-only**. Bundled third-party components retain their respective licenses. [Read the full license](LICENSE).
