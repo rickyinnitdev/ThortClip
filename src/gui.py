@@ -106,6 +106,13 @@ class RecorderWindow:
         root.minsize(880, 560)
         root.update_idletasks()
 
+        # Disable DWM window transitions for the library window only.
+        frame = wintypes.HWND(int(root.tk.call("wm", "frame", root._w), 0))
+        disabled = wintypes.BOOL(True)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            frame, 3, ctypes.byref(disabled), ctypes.sizeof(disabled)
+        )
+
         self.checking_update = False
         self.manual_update = False
         self.pending_update = None
