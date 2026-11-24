@@ -301,7 +301,7 @@ class ClipPlayerView(tk.Frame):
         right_ctrl = tk.Frame(ctrl_bar, bg=palette.CARD_BG)
         right_ctrl.pack(side="right", padx=(8, 0))
 
-        tk.Label(right_ctrl, text="Thot Clip", font=("Segoe UI", 9, "bold"), fg=palette.LINK, bg=palette.CARD_BG).pack(side="left", padx=(0, 8))
+        tk.Label(right_ctrl, text="ThortClip", font=("Segoe UI", 9, "bold"), fg=palette.LINK, bg=palette.CARD_BG).pack(side="left", padx=(0, 8))
 
         # 4. Extended Timeline & Filmstrip Section
         timeline_box = tk.Frame(self, bg=palette.CARD_BG, padx=16, pady=10, highlightbackground=palette.CARD_BORDER, highlightthickness=1)

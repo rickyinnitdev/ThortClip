@@ -21,7 +21,7 @@ if not Path("config.json").exists():
         "recorder": {"capture_method": "gfxcapture", "encoder": encoder,
                      "resolution": f"{w}x{h}", "fps": 30 if encoder == "libx264" else 60,
                      "stretch_to_widescreen": True, "audio_device": "system", "auto_clip_round": False},
-        "paths": {"clips_output_dir": str(Path.home() / "Videos" / "Thot Clip")},
+        "paths": {"clips_output_dir": str(Path.home() / "Videos" / "ThortClip")},
         "overlay": {"enabled": False, "device": ""}
     }
     Path("config.json").write_text(json.dumps(settings, indent=2), encoding="utf8")

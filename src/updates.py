@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-ASSET = "ThotClip-Setup-x64.exe"
+ASSET = "ThortClip-Setup-x64.exe"
 
 
 def stage_update(channel, directory):
@@ -15,7 +15,7 @@ def stage_update(channel, directory):
     if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo):
         raise ValueError("Invalid release repository")
     request = Request(f"https://api.github.com/repos/{repo}/releases/latest",
-                      headers={"User-Agent": "ThotClip-Updater", "Accept": "application/vnd.github+json"})
+                      headers={"User-Agent": "ThortClip-Updater", "Accept": "application/vnd.github+json"})
     with urlopen(request, timeout=15) as response:
         release = json.load(response)
     tag = release["tag_name"]

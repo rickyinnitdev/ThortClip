@@ -1,12 +1,12 @@
-# Thot Clip
+# ThortClip
 
-Thot Clip saves local Valorant highlights on Windows. The installer includes the recorder, player, and media tools. Press **F8** for a manual clip, or let the kill-feed detector save personal highlights by round.
+ThortClip saves local Valorant highlights on Windows. The installer includes the recorder, player, and media tools. Press **F8** for a manual clip, or let the kill-feed detector save personal highlights by round.
 
-[Download the latest Windows x64 installer](https://github.com/rickyinnitdev/ThotClip/releases/latest/download/ThotClip-Setup-x64.exe) · [GitHub Packages](https://github.com/rickyinnitdev/ThotClip/packages)
+[Download the latest Windows x64 installer](https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe) · [GitHub Packages](https://github.com/rickyinnitdev/ThortClip/packages)
 
 ## License
 
-Copyright 2026 Morm Kimheng (rickyinnitdev). Thot Clip’s own source code is licensed under the GNU General Public License, version 3 only (SPDX identifier `GPL-3.0-only`). Bundled third-party components retain their respective licenses. [Full license](LICENSE)
+Copyright 2026 Morm Kimheng (rickyinnitdev). ThortClip’s own source code is licensed under the GNU General Public License, version 3 only (SPDX identifier `GPL-3.0-only`). Bundled third-party components retain their respective licenses. [Full license](LICENSE)
 
 ## Current Windows profile
 
@@ -41,7 +41,7 @@ A clean, high-performance game recorder and auto-clipper designed with a modular
                      | Active Round                                    | Kill Event Trigger
                      v                                                 v
   +-------------------------------------------------------------------------------+
-  |                                  Thot Clip                                    |
+  |                                  ThortClip                                    |
   |  - ScreenRecorder: FFmpeg -> 2s .ts rolling buffer (auto-pruned to 120s)      |
   |  - Hotkey Source: [F8] global key fallback                                    |
   |  - VideoCutter: Concat completed .ts segments with -c copy -> clean .mp4      |
@@ -120,7 +120,7 @@ This generates visual debug files in `debug_output/`:
 ```
 
 ## Features
-- **Thot Clip desktop interface**: Sleek dark gaming dashboard with Clips Library grid, Video Overlays screen, Capture Status monitor, and PC Storage indicator.
+- **ThortClip desktop interface**: Sleek dark gaming dashboard with Clips Library grid, Video Overlays screen, Capture Status monitor, and PC Storage indicator.
 - **Webcam Video Overlay**: Capture USB webcams and virtual cameras (OBS). Drag-and-drop webcam positioning on an interactive 16:9 preview canvas, custom scale adjustment (10%–45%), and corner presets.
 - **Zero Game FPS Impact**: Lightweight Tkinter/Python architecture (<40 MB RAM, 0% CPU on standby). Screen capture runs hardware-accelerated directly in GPU VRAM without pipeline contention.
 

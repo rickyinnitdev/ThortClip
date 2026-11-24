@@ -100,8 +100,8 @@ class RecorderWindow:
         self.camera_snapshot_img = None
         self.camera_snapshot_photo = None
 
-        root.title("Thot Clip")
-        root.iconbitmap(str(Path(__file__).with_name("assets") / "thotclip.ico"))
+        root.title("ThortClip")
+        root.iconbitmap(str(Path(__file__).with_name("assets") / "thortclip.ico"))
         root.geometry("1060x680")
         root.minsize(880, 560)
         root.update_idletasks()
@@ -189,13 +189,13 @@ class RecorderWindow:
         brand = tk.Frame(self.sidebar, bg=palette.CARD_BG, padx=18, pady=20)
         brand.pack(fill="x")
 
-        with Image.open(Path(__file__).with_name("assets") / "thotclip.png") as logo:
+        with Image.open(Path(__file__).with_name("assets") / "thortclip.png") as logo:
             self.brand_icon = ImageTk.PhotoImage(logo.resize((36, 36), Image.Resampling.LANCZOS))
         tk.Label(brand, image=self.brand_icon, bg=palette.CARD_BG).pack(side="left", padx=(0, 10))
 
         title_box = tk.Frame(brand, bg=palette.CARD_BG)
         title_box.pack(side="left", fill="y")
-        tk.Label(title_box, text="Thot Clip", font=("Georgia", 17, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
+        tk.Label(title_box, text="ThortClip", font=("Georgia", 17, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
         tk.Label(title_box, text="VALORANT", font=("Segoe UI", 8, "bold"), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w")
 
         # Nav Section Header
@@ -310,7 +310,7 @@ class RecorderWindow:
             "settings": "Settings",
             "player": "Clip Player & Editor",
         }
-        self.top_title.configure(text=titles.get(name, "Thot Clip"))
+        self.top_title.configure(text=titles.get(name, "ThortClip"))
 
         for key, btn in self.nav_buttons.items():
             if key == name:
@@ -1795,7 +1795,7 @@ def main():
         app.start_services()
         RecorderWindow(root, app)
     except Exception as exc:
-        messagebox.showerror("Thot Clip startup", str(exc), parent=root)
+        messagebox.showerror("ThortClip startup", str(exc), parent=root)
         root.destroy()
         return
     root.mainloop()

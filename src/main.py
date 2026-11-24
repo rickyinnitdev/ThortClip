@@ -53,7 +53,7 @@ class MedalReaApp:
     def start_services(self):
         self._running = True
         print("=" * 65)
-        print("       Thot Clip Lightweight Valorant Auto-Clipper")
+        print("       ThortClip Lightweight Valorant Auto-Clipper")
         print("=" * 65)
         print(f" Video Encoder:       {self.config.encoder} (Hardware accelerated)")
         print(f" Capture Mode:        2-second .ts rolling segments")

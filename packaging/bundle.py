@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory() as temp:
             if path.is_file():
                 archive.write(path, path.relative_to(app))
     csc = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
-    subprocess.run([str(csc), "/nologo", "/target:winexe", "/platform:x64", f"/win32icon:{Path(__file__).resolve().parents[1] / 'src/assets/thotclip.ico'}",
+    subprocess.run([str(csc), "/nologo", "/target:winexe", "/platform:x64", f"/win32icon:{Path(__file__).resolve().parents[1] / 'src/assets/thortclip.ico'}",
                     "/reference:System.IO.Compression.dll", "/reference:System.IO.Compression.FileSystem.dll",
                     f"/resource:{payload},payload.zip", f"/out:{output}", str(Path(__file__).with_name("Setup.cs"))], check=True)
 print(output, output.stat().st_size)
