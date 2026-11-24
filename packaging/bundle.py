@@ -19,6 +19,7 @@ for name in ("libvlc.dll", "libvlccore.dll", "COPYING.txt", "AUTHORS.txt"):
 shutil.copytree(vlc / "plugins", video / "plugins", dirs_exist_ok=True)
 licenses = tools / "licenses"
 licenses.mkdir(exist_ok=True)
+shutil.copy2(Path(__file__).resolve().parents[1] / "LICENSE", app / "LICENSE.txt")
 (licenses / "FFmpeg.txt").write_text(subprocess.check_output([str(capture), "-L"], stderr=subprocess.STDOUT).decode(errors="replace"), encoding="utf8")
 prefix = Path(sys.base_prefix)
 if (prefix / "LICENSE.txt").exists():

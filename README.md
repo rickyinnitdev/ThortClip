@@ -2,6 +2,12 @@
 
 Thot Clip saves local Valorant highlights on Windows. The installer includes the recorder, player, and media tools. Press **F8** for a manual clip, or let the kill-feed detector save personal highlights by round.
 
+[Download the latest Windows x64 installer](https://github.com/rickyinnitdev/ThotClip/releases/latest/download/ThotClip-Setup-x64.exe) · [GitHub Packages](https://github.com/rickyinnitdev/ThotClip/packages)
+
+## License
+
+Copyright 2026 Morm Kimheng (rickyinnitdev). Thot Clip’s own source code is licensed under the GNU General Public License, version 3 only (SPDX identifier `GPL-3.0-only`). Bundled third-party components retain their respective licenses. [Full license](LICENSE)
+
 ## Current Windows profile
 
 Launch `run.bat` for the recorder window. The configured profile uses Windows Graphics Capture and NVIDIA HEVC at 1568×1080, 60 FPS, and 24 Mb/s, with Windows playback captured as stereo AAC on the configured PC. The capture backend uses the FFmpeg 9.1 executable in `%LOCALAPPDATA%/MedalRea/tools`, or a compatible FFmpeg on PATH. The screen detector reads the full-resolution local attacker entry in the top-right kill feed. Automatic clips span the first through the last personal kill of each round. The optional round-ending setting extends only rounds that have kills.

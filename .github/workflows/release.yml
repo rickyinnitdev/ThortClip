@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  packages: write
 concurrency:
   group: windows-release
   cancel-in-progress: false
@@ -18,6 +19,10 @@ jobs:
         with:
           python-version: "3.12"
           architecture: x64
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Install build dependencies
         run: python -m pip install customtkinter==5.2.2 PyInstaller==6.22.3 Pillow==13.0.0 numpy==2.3.5 dxcam==0.3.0 comtypes==1.5.0 PyAudioWPatch==0.2.12.9
       - name: Build application
@@ -44,4 +49,11 @@ jobs:
           python packaging/bundle.py dist/ThotClip "$media/ffmpeg.exe" "$media/ffprobe.exe" "$media/ffplay.exe" "$media/vlc" release/ThotClip-Setup-x64.exe
           if ($LASTEXITCODE) { throw "Packaging failed" }
           gh release create "build-$env:GITHUB_RUN_NUMBER" release/ThotClip-Setup-x64.exe --title "Thot Clip build $env:GITHUB_RUN_NUMBER" --target "$env:GITHUB_SHA" --generate-notes --latest
-
+      - name: Publish installer to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file `
+            "-DrepositoryId=github" "-Durl=https://maven.pkg.github.com/$env:GITHUB_REPOSITORY" `
+            "-DgroupId=io.github.rickyinnitdev" "-DartifactId=thotclip" "-Dversion=1.0.$env:GITHUB_RUN_NUMBER" `
+            "-Dpackaging=exe" "-Dfile=release/ThotClip-Setup-x64.exe" "-DgeneratePom=true"
