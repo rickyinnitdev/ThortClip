@@ -110,10 +110,30 @@ class RecorderWindow:
         self.manual_update = False
         self.pending_update = None
         self.build_interface("library")
+        self.repaint_pending = False
+        root.bind("<Activate>", self._schedule_repaint, add="+")
+        root.bind("<Map>", self._schedule_repaint, add="+")
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.refresh()
         if os.environ.get("MEDALREA_BUNDLE_TOOLS"):
             self.root.after(2500, self.check_update)
+
+    def _schedule_repaint(self, event):
+        if event.widget is self.root and not self.repaint_pending:
+            self.repaint_pending = True
+            self.root.after_idle(self._repaint_window)
+
+    def _repaint_window(self):
+        self.repaint_pending = False
+        if self.root.winfo_viewable():
+            # Invalidate the native frame and all Tk child windows on restore.
+            user32 = ctypes.windll.user32
+            client = ctypes.c_void_p(self.root.winfo_id())
+            get_parent = user32.GetParent
+            get_parent.restype = ctypes.c_void_p
+            frame = ctypes.c_void_p(get_parent(client) or client.value)
+            # RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN
+            user32.RedrawWindow(frame, None, None, 0x481)
 
     def build_interface(self, view_name):
         root = self.root
