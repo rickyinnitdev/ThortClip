@@ -106,6 +106,8 @@ class RecorderWindow:
         root.minsize(880, 560)
         root.update_idletasks()
 
+        self.checking_update = False
+        self.manual_update = False
         self.build_interface("library")
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.pending_update = None
@@ -221,6 +223,13 @@ class RecorderWindow:
             )
             btn.pack(fill="x", padx=10, pady=2)
             self.nav_buttons[key] = btn
+
+        self.check_button = RoundedButton(
+            self.sidebar, text="Check for update", command=lambda: self.check_update(manual=True),
+            fg=palette.TEXT, bg=palette.CARD_BG, activebackground=palette.CARD_HOVER,
+            activeforeground=palette.TEXT, font=("Segoe UI", 9, "bold"),
+        )
+        self.check_button.pack(fill="x", padx=10, pady=2)
 
         # Spacer to push storage to bottom
         spacer = tk.Frame(self.sidebar, bg=palette.CARD_BG)
@@ -1613,6 +1622,17 @@ class RecorderWindow:
                 self._apply_audio_devices(item[1], item[2])
             elif event_type == "camera_devices":
                 self._apply_cameras(item[1], item[2])
+            elif event_type == "update_checked":
+                self.checking_update = False
+                self.check_button.configure(text="Check for update", state="normal")
+                if self.manual_update:
+                    if item[2]:
+                        messagebox.showerror("Check for update", item[2], parent=self.root)
+                    elif not item[1]:
+                        messagebox.showinfo("Check for update", "You’re up to date.", parent=self.root)
+                self.manual_update = False
+                if item[1]:
+                    self.events.put(("update_ready", item[1]))
             elif event_type == "update_ready":
                 self.pending_update = item[1]
                 if not hasattr(self, "update_button"):
@@ -1747,23 +1767,36 @@ class RecorderWindow:
         delay = 1000 if self.root.state() == "normal" else 5000
         self.root.after(delay, self.refresh)
 
-    def check_update(self):
+    def check_update(self, manual=False):
         from .updates import stage_update
-        channel = Path(os.environ["MEDALREA_BUNDLE_TOOLS"]).parent / "release.json"
-        if not channel.is_file():
+        bundle = os.environ.get("MEDALREA_BUNDLE_TOOLS")
+        if not bundle:
+            if manual:
+                import webbrowser
+                webbrowser.open("https://github.com/rickyinnitdev/ThortClip/releases/latest")
             return
+        if not manual:
+            self.root.after(4 * 3600 * 1000, self.check_update)
+        if self.pending_update:
+            if manual:
+                messagebox.showinfo("Check for update", "Update ready. Use Restart to update between matches.", parent=self.root)
+            return
+        self.manual_update |= manual
+        if self.checking_update:
+            return
+        self.checking_update = True
+        self.check_button.configure(text="Checking…")
 
         def work():
             try:
+                channel = Path(bundle).parent / "release.json"
                 path = stage_update(json.loads(channel.read_text(encoding="utf8")),
                                     Path(os.environ["LOCALAPPDATA"]) / "MedalRea" / "updates")
-                if path:
-                    self.events.put(("update_ready", path))
-            except (OSError, ValueError, KeyError, StopIteration):
-                pass
+                self.events.put(("update_checked", path, ""))
+            except Exception as exc:
+                self.events.put(("update_checked", None, f"Could not check or download the update. {exc}"))
 
         threading.Thread(target=work, daemon=True).start()
-        self.root.after(4 * 3600 * 1000, self.check_update)
 
     def restart_for_update(self):
         if self.busy or self.app.recorder.is_recording() or self.app.log_watcher.in_match:

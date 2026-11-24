@@ -29,7 +29,7 @@ On first launch, the installer-created profile uses the primary display resoluti
 
 The recorder keeps a rolling buffer of short segments. Standard highlights use stream copy; adding a webcam overlay requires video re-encoding. The detector looks for the local attacker and checks the spectator HUD to avoid crediting a teammate’s kill.
 
-The installed app checks GitHub Releases on launch and every four hours. When a newer installer has downloaded and passed its checksum check, **Restart to update** appears in the top bar. Restart is available between matches after recording and clip saves finish. Source checkouts launched with `run.bat` use Git for updates.
+Click **Check for update** below Settings in the sidebar to check immediately. The installed app also checks GitHub Releases on launch and every four hours. When a newer installer has downloaded and passed its checksum check, **Restart to update** appears in the top bar. Restart is available between matches after recording and clip saves finish. Source checkouts launched with `run.bat` use Git for updates.
 
 ## Development
 
