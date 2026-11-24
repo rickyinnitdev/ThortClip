@@ -176,6 +176,9 @@ class ScreenRecorder:
         if self.config.audio_device and self.config.audio_device.lower() != "none":
             cmd += ["-c:a", "aac", "-b:a", "192k"]
 
+        if self.config.stretch_to_widescreen:
+            cmd += ["-aspect:v", "16:9"]
+
         # 2-second MPEG-TS segments
         cmd += [
             "-f", "segment",

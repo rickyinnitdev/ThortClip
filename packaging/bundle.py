@@ -24,7 +24,7 @@ prefix = Path(sys.base_prefix)
 if (prefix / "LICENSE.txt").exists():
     shutil.copy2(prefix / "LICENSE.txt", licenses / "Python.txt")
 from importlib.metadata import distribution
-for package in ("pillow","numpy","comtypes","dxcam","pyaudiowpatch","pyinstaller"):
+for package in ("customtkinter","darkdetect","pillow","numpy","comtypes","dxcam","pyaudiowpatch","pyinstaller"):
     dist = distribution(package)
     for entry in dist.files or ():
         if ".dist-info/" in str(entry) and any(x in entry.name.upper() for x in ("LICENSE","COPYING","NOTICE")):

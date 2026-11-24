@@ -20,7 +20,7 @@ if not Path("config.json").exists():
     settings = {
         "recorder": {"capture_method": "gfxcapture", "encoder": encoder,
                      "resolution": f"{w}x{h}", "fps": 30 if encoder == "libx264" else 60,
-                     "audio_device": "system", "auto_clip_round": False},
+                     "stretch_to_widescreen": True, "audio_device": "system", "auto_clip_round": False},
         "paths": {"clips_output_dir": str(Path.home() / "Videos" / "Thot Clip")},
         "overlay": {"enabled": False, "device": ""}
     }

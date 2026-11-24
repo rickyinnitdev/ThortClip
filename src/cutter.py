@@ -9,7 +9,8 @@ from .camera_manager import get_ffmpeg_binary
 class VideoCutter:
     """Concatenates completed .ts segments into a pristine .mp4 clip with optional webcam overlay."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, *, stretch: bool = False):
+        self.stretch = stretch
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -143,6 +144,9 @@ class VideoCutter:
                     str(pending),
                 ]
 
+            if self.stretch:
+                cmd[-1:-1] = ["-aspect:v", "16:9"]
+
             start_t = time.time()
             res = subprocess.run(
                 cmd,
@@ -165,6 +169,8 @@ class VideoCutter:
                         binary, "-y", "-f", "concat", "-safe", "0",
                         "-i", str(concat_txt), "-c", "copy", "-movflags", "+faststart", str(pending)
                     ]
+                    if self.stretch:
+                        cmd_fallback[-1:-1] = ["-aspect:v", "16:9"]
                     res2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                     if res2.returncode == 0 and pending.is_file():

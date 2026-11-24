@@ -22,7 +22,7 @@ class MedalReaApp:
     def __init__(self, config_path: str = "config.json"):
         self.config = Config(config_path)
         self.recorder = ScreenRecorder(self.config)
-        self.cutter = VideoCutter(self.config.clips_output_dir)
+        self.cutter = VideoCutter(self.config.clips_output_dir, stretch=self.config.stretch_to_widescreen)
         
         self.results = MatchResults(self.config, self.cutter)
         self.result_match = None

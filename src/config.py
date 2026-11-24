@@ -36,6 +36,7 @@ class Config:
         with open(self.config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        self.dark_mode = bool(data.get("appearance", {}).get("dark_mode", False))
         rec = data.get("recorder", {})
         self.capture_method = rec.get("capture_method", "auto")
         self.encoder = rec.get("encoder", "auto")
@@ -43,6 +44,7 @@ class Config:
             self.encoder = detect_encoder()
 
         self.resolution = rec.get("resolution", "1920x1080")
+        self.stretch_to_widescreen = bool(rec.get("stretch_to_widescreen", False))
         self.fps = int(rec.get("fps", 60))
         self.bitrate = rec.get("bitrate", "8M")
         self.buffer_duration_sec = int(rec.get("buffer_duration_sec", 120))
@@ -203,9 +205,9 @@ class Config:
         finally:
             pending.unlink(missing_ok=True)
 
-    def set_auto_clip_round(self, enabled: bool):
+    def set_preference(self, section, key, value):
         data = json.loads(self.config_path.read_text(encoding="utf-8"))
-        data.setdefault("recorder", {})["auto_clip_round"] = enabled
+        data.setdefault(section, {})[key] = value
         with tempfile.NamedTemporaryFile(dir=self.config_path.parent, delete=False) as temp:
             pending = Path(temp.name)
         try:
@@ -213,4 +215,7 @@ class Config:
             pending.replace(self.config_path)
         finally:
             pending.unlink(missing_ok=True)
+
+    def set_auto_clip_round(self, enabled: bool):
+        self.set_preference("recorder", "auto_clip_round", enabled)
         self.auto_clip_round = enabled

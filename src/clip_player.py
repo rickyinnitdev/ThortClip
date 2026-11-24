@@ -16,6 +16,7 @@ import threading
 import time
 from pathlib import Path
 import tkinter as tk
+from .theme import palette
 from tkinter import ttk, messagebox
 from typing import List, Optional, Dict, Any, Callable
 
@@ -24,17 +25,8 @@ from .ui_controls import RoundedButton
 from PIL import Image, ImageTk
 
 # Theme Colors (Medal.tv Palette)
-BG = "#0d1117"
-CARD_BG = "#161b22"
-CARD_BORDER = "#21262d"
-SIDEBAR_BG = "#090d13"
-ACCENT = "#00f59b"      # Medal Mint Green
-ACCENT_HOVER = "#00d885"
 PURPLE = "#a855f7"      # Medal Star Purple
 PURPLE_DARK = "#7e22ce"
-TEXT = "#f0f6fc"
-MUTED = "#8b949e"
-DIM = "#484f58"
 DANGER = "#f85149"
 TRIM_DIM = "#000000"
 
@@ -174,7 +166,7 @@ class ClipPlayerView(tk.Frame):
     """Full-featured Medal.tv clip player with kill stars, filmstrip, and trimming."""
 
     def __init__(self, parent: tk.Widget, on_close: Callable[[], None], on_refresh_library: Optional[Callable[[], None]] = None):
-        super().__init__(parent, bg=BG)
+        super().__init__(parent, bg=palette.BG)
         self.on_close_cb = on_close
         self.on_refresh_library_cb = on_refresh_library
 
@@ -212,51 +204,51 @@ class ClipPlayerView(tk.Frame):
 
     def _build_ui(self):
         # 1. Top Header Bar
-        top_bar = tk.Frame(self, bg=BG, padx=20, pady=12)
+        top_bar = tk.Frame(self, bg=palette.BG, padx=20, pady=12)
         top_bar.pack(fill="x")
 
         # Back Button
         back_btn = RoundedButton(
             top_bar, text="← Back to Library", font=("Segoe UI", 10, "bold"),
-            bg=CARD_BG, fg=TEXT, activebackground=CARD_BORDER, activeforeground=TEXT,
+            bg=palette.CARD_BG, fg=palette.TEXT, activebackground=palette.CARD_BORDER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", padx=14, pady=6, command=self.close_player
         )
         back_btn.pack(side="left")
 
         # Title & Subtitle Container
-        self.title_container = tk.Frame(top_bar, bg=BG, padx=16)
+        self.title_container = tk.Frame(top_bar, bg=palette.BG, padx=16)
         self.title_container.pack(side="left", fill="x", expand=True)
 
         self.clip_title_label = tk.Label(
-            self.title_container, text="Loading clip...", font=("Segoe UI", 13, "bold"),
-            fg=TEXT, bg=BG, anchor="w"
+            self.title_container, text="Loading clip...", font=("Georgia", 17, "bold"),
+            fg=palette.TEXT, bg=palette.BG, anchor="w"
         )
         self.clip_title_label.pack(anchor="w")
 
         self.clip_meta_label = tk.Label(
             self.title_container, text="", font=("Segoe UI", 9),
-            fg=MUTED, bg=BG, anchor="w"
+            fg=palette.MUTED, bg=palette.BG, anchor="w"
         )
         self.clip_meta_label.pack(anchor="w", pady=(1, 0))
 
         # Top Right Actions
-        right_box = tk.Frame(top_bar, bg=BG)
+        right_box = tk.Frame(top_bar, bg=palette.BG)
         right_box.pack(side="right")
 
         RoundedButton(
             right_box, text="📁 Show in Folder", font=("Segoe UI", 9),
-            bg=CARD_BG, fg=TEXT, activebackground=CARD_BORDER, activeforeground=TEXT,
+            bg=palette.CARD_BG, fg=palette.TEXT, activebackground=palette.CARD_BORDER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", padx=10, pady=5, command=self._open_in_folder
         ).pack(side="left", padx=4)
 
         RoundedButton(
             right_box, text="📋 Copy Path", font=("Segoe UI", 9),
-            bg=CARD_BG, fg=TEXT, activebackground=CARD_BORDER, activeforeground=TEXT,
+            bg=palette.CARD_BG, fg=palette.TEXT, activebackground=palette.CARD_BORDER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", padx=10, pady=5, command=self._copy_path
         ).pack(side="left", padx=4)
 
         # 2. Central Video Player Viewport
-        self.video_outer = tk.Frame(self, bg="#05070a", highlightbackground=CARD_BORDER, highlightthickness=1)
+        self.video_outer = tk.Frame(self, bg="#05070a", highlightbackground=palette.CARD_BORDER, highlightthickness=1)
         self.video_outer.pack(fill="both", expand=True, padx=20, pady=(0, 8))
 
         # The actual host frame for embedded ffplay
@@ -271,52 +263,52 @@ class ClipPlayerView(tk.Frame):
         self.video_canvas.bind("<Button-1>", lambda e: self.toggle_play_pause())
 
         # 3. Video Controls Bar (Seekbar with Kill Stars ⭐ + Buttons)
-        ctrl_bar = tk.Frame(self, bg=CARD_BG, padx=16, pady=8, highlightbackground=CARD_BORDER, highlightthickness=1)
+        ctrl_bar = tk.Frame(self, bg=palette.CARD_BG, padx=16, pady=8, highlightbackground=palette.CARD_BORDER, highlightthickness=1)
         ctrl_bar.pack(fill="x", padx=20, pady=(0, 8))
 
         # Buttons on left of seekbar
-        btn_box = tk.Frame(ctrl_bar, bg=CARD_BG)
+        btn_box = tk.Frame(ctrl_bar, bg=palette.CARD_BG)
         btn_box.pack(side="left", padx=(0, 12))
 
         self.btn_play = RoundedButton(
             btn_box, text="▶", font=("Segoe UI", 12, "bold"),
-            bg=ACCENT, fg=BG, activebackground=ACCENT_HOVER, activeforeground=BG,
+            bg=palette.ACCENT, fg=palette.TEXT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", width=3, pady=2, command=self.toggle_play_pause
         )
         self.btn_play.pack(side="left")
 
         self.time_label = tk.Label(
             btn_box, text="00:00 / 00:00", font=("Segoe UI", 10, "bold"),
-            fg=TEXT, bg=CARD_BG, padx=10
+            fg=palette.TEXT, bg=palette.CARD_BG, padx=10
         )
         self.time_label.pack(side="left")
 
         self.btn_vol = RoundedButton(
             btn_box, text="🔊", font=("Segoe UI", 10),
-            bg=CARD_BG, fg=TEXT, activebackground=CARD_BORDER, activeforeground=TEXT,
+            bg=palette.CARD_BG, fg=palette.TEXT, activebackground=palette.CARD_BORDER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", padx=6, pady=2, command=self.toggle_mute
         )
         self.btn_vol.pack(side="left")
 
         # Kill Star Seekbar (Canvas)
-        self.seekbar = tk.Canvas(ctrl_bar, height=32, bg=CARD_BG, highlightthickness=0, cursor="hand2")
+        self.seekbar = tk.Canvas(ctrl_bar, height=32, bg=palette.CARD_BG, highlightthickness=0, cursor="hand2")
         self.seekbar.pack(side="left", fill="x", expand=True, padx=8)
         self.seekbar.bind("<Configure>", lambda e: self._redraw_seekbar())
         self.seekbar.bind("<Button-1>", self._on_seekbar_click)
         self.seekbar.bind("<B1-Motion>", self._on_seekbar_drag)
 
         # Right side branding / fullscreen
-        right_ctrl = tk.Frame(ctrl_bar, bg=CARD_BG)
+        right_ctrl = tk.Frame(ctrl_bar, bg=palette.CARD_BG)
         right_ctrl.pack(side="right", padx=(8, 0))
 
-        tk.Label(right_ctrl, text="Thot Clip", font=("Segoe UI", 9, "bold"), fg=ACCENT, bg=CARD_BG).pack(side="left", padx=(0, 8))
+        tk.Label(right_ctrl, text="Thot Clip", font=("Segoe UI", 9, "bold"), fg=palette.LINK, bg=palette.CARD_BG).pack(side="left", padx=(0, 8))
 
         # 4. Extended Timeline & Filmstrip Section
-        timeline_box = tk.Frame(self, bg=CARD_BG, padx=16, pady=10, highlightbackground=CARD_BORDER, highlightthickness=1)
+        timeline_box = tk.Frame(self, bg=palette.CARD_BG, padx=16, pady=10, highlightbackground=palette.CARD_BORDER, highlightthickness=1)
         timeline_box.pack(fill="x", padx=20, pady=(0, 8))
 
         # Timeline Header / Ruler Canvas
-        self.ruler_canvas = tk.Canvas(timeline_box, height=20, bg=CARD_BG, highlightthickness=0)
+        self.ruler_canvas = tk.Canvas(timeline_box, height=20, bg=palette.CARD_BG, highlightthickness=0)
         self.ruler_canvas.pack(fill="x", pady=(0, 2))
         self.ruler_canvas.bind("<Configure>", lambda e: self._redraw_ruler())
 
@@ -329,36 +321,36 @@ class ClipPlayerView(tk.Frame):
         self.filmstrip_canvas.bind("<ButtonRelease-1>", self._on_filmstrip_release)
 
         # 5. Bottom Action Bar
-        bot_bar = tk.Frame(self, bg=BG, padx=20, pady=8)
+        bot_bar = tk.Frame(self, bg=palette.BG, padx=20, pady=8)
         bot_bar.pack(fill="x")
 
         # Audio Track Indicator
         self.audio_pill = tk.Label(
             bot_bar, text="🔊 Game + Mic Mixed", font=("Segoe UI", 9, "bold"),
-            fg=ACCENT, bg=CARD_BG, padx=10, pady=4, relief="flat"
+            fg=palette.LINK, bg=palette.CARD_BG, padx=10, pady=4, relief="flat"
         )
         self.audio_pill.pack(side="left")
 
         # Shortcuts guide
         hint = tk.Label(
             bot_bar, text="[Space] Play/Pause  •  [←] [→] Seek 5s  •  Drag [ ] to trim  •  Click ⭐ to jump to Kill",
-            font=("Segoe UI", 9), fg=MUTED, bg=BG
+            font=("Segoe UI", 9), fg=palette.MUTED, bg=palette.BG
         )
         hint.pack(side="left", padx=20)
 
         # Right: Trim stats & Save Edits button
-        right_bot = tk.Frame(bot_bar, bg=BG)
+        right_bot = tk.Frame(bot_bar, bg=palette.BG)
         right_bot.pack(side="right")
 
         self.trim_stats_label = tk.Label(
             right_bot, text="Trim: 00:00 - 00:00 (0.0s)", font=("Segoe UI", 9),
-            fg=MUTED, bg=BG, padx=8
+            fg=palette.MUTED, bg=palette.BG, padx=8
         )
         self.trim_stats_label.pack(side="left")
 
         self.btn_save_edits = RoundedButton(
             right_bot, text="✂️  Save Edits", font=("Segoe UI", 10, "bold"),
-            bg=ACCENT, fg=BG, activebackground=ACCENT_HOVER, activeforeground=BG,
+            bg=palette.ACCENT, fg=palette.TEXT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
             relief="flat", cursor="hand2", padx=16, pady=5, command=self.save_edits
         )
         self.btn_save_edits.pack(side="left")
@@ -687,7 +679,7 @@ class ClipPlayerView(tk.Frame):
         h = self.video_host.winfo_height() or 360
         self.video_canvas.create_text(
             w // 2, h // 2, text=text,
-            font=("Segoe UI", 12), fill=MUTED
+            font=("Segoe UI", 12), fill=palette.MUTED
         )
         self.video_canvas.place(x=0, y=0, relwidth=1, relheight=1)
 
@@ -715,7 +707,7 @@ class ClipPlayerView(tk.Frame):
         frac = min(1.0, max(0.0, self.current_time / self.duration))
         progress_x = pad_x + int(active_w * frac)
         c.create_rectangle(pad_x, cy - bar_h // 2, progress_x, cy + bar_h // 2,
-                           fill=ACCENT, outline="", width=0)
+                           fill=palette.ACCENT, outline="", width=0)
 
         # Draw Kill Stars ⭐ on the seekbar
         for i, k_sec in enumerate(self.kills):
@@ -727,7 +719,7 @@ class ClipPlayerView(tk.Frame):
             c.create_text(kx, cy - 14, text=f"K{i+1}", font=("Segoe UI", 7, "bold"), fill=PURPLE)
 
         # Playhead handle (circle)
-        c.create_oval(progress_x - 5, cy - 5, progress_x + 5, cy + 5, fill="#ffffff", outline=ACCENT, width=2)
+        c.create_oval(progress_x - 5, cy - 5, progress_x + 5, cy + 5, fill="#ffffff", outline=palette.ACCENT, width=2)
 
     def _on_seekbar_click(self, event):
         w = self.seekbar.winfo_width() or 600
@@ -771,9 +763,9 @@ class ClipPlayerView(tk.Frame):
             frac = t / self.duration
             x = pad_x + int(active_w * frac)
             # Tick line
-            c.create_line(x, h - 6, x, h, fill="#484f58", width=1)
+            c.create_line(x, h - 6, x, h, fill=palette.DIM, width=1)
             # Label
-            c.create_text(x, h - 12, text=self._format_time(t), font=("Segoe UI", 8), fill=MUTED)
+            c.create_text(x, h - 12, text=self._format_time(t), font=("Segoe UI", 8), fill=palette.MUTED)
             t += step_sec
 
     def _redraw_filmstrip(self):
@@ -836,11 +828,11 @@ class ClipPlayerView(tk.Frame):
 
         # Trim Handles
         # Left handle
-        c.create_rectangle(start_x - 4, 0, start_x, h, fill=ACCENT, outline="")
-        c.create_polygon([start_x, 0, start_x + 8, 0, start_x, 8], fill=ACCENT, outline="")
+        c.create_rectangle(start_x - 4, 0, start_x, h, fill=palette.ACCENT, outline="")
+        c.create_polygon([start_x, 0, start_x + 8, 0, start_x, 8], fill=palette.ACCENT, outline="")
         # Right handle
-        c.create_rectangle(end_x, 0, end_x + 4, h, fill=ACCENT, outline="")
-        c.create_polygon([end_x, 0, end_x - 8, 0, end_x, 8], fill=ACCENT, outline="")
+        c.create_rectangle(end_x, 0, end_x + 4, h, fill=palette.ACCENT, outline="")
+        c.create_polygon([end_x, 0, end_x - 8, 0, end_x, 8], fill=palette.ACCENT, outline="")
 
         self._redraw_playhead()
 
@@ -852,10 +844,10 @@ class ClipPlayerView(tk.Frame):
         h = c.winfo_height()
         cur_frac = min(1.0, max(0.0, self.current_time / self.duration))
         playhead_x = pad_x + int(active_w * cur_frac)
-        c.create_line(playhead_x, 0, playhead_x, h, tags="playhead", fill=ACCENT, width=2)
+        c.create_line(playhead_x, 0, playhead_x, h, tags="playhead", fill=palette.ACCENT, width=2)
         # Pill top
-        c.create_rectangle(playhead_x - 14, 0, playhead_x + 14, 14, tags="playhead", fill=ACCENT, outline="")
-        c.create_text(playhead_x, 7, text=self._format_time(self.current_time), font=("Segoe UI", 7, "bold"), tags="playhead", fill=BG)
+        c.create_rectangle(playhead_x - 14, 0, playhead_x + 14, 14, tags="playhead", fill=palette.ACCENT, outline="")
+        c.create_text(playhead_x, 7, text=self._format_time(self.current_time), font=("Segoe UI", 7, "bold"), tags="playhead", fill=palette.TEXT)
 
     def _on_filmstrip_click(self, event):
         w = self.filmstrip_canvas.winfo_width() or 700

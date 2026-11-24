@@ -1,4 +1,5 @@
 """Shared rounded ttk controls. Each visual style owns a small reusable image set."""
+from .theme import palette
 from tkinter import ttk
 from PIL import Image, ImageDraw, ImageTk
 
@@ -31,8 +32,8 @@ class RoundedButton(ttk.Button):
             p = self.palette
             name = f"Medal{len(root._button_styles)}"
             style = ttk.Style(root)
-            images = [surface(root, p["bg"], p["bg"], outside), surface(root, p["activebackground"], "#74879a", outside),
-                      surface(root, p["bg"], "#a6ffe0", outside), surface(root, "#202631", "#333d49", outside)]
+            images = [surface(root, p["bg"], palette.CARD_BORDER, outside), surface(root, p["activebackground"], "#434239", outside),
+                      surface(root, p["bg"], "#6754AA", outside), surface(root, palette.SECONDARY, "#C3BEB4", outside)]
             element = name + ".surface"
             style.element_create(element, "image", images[0], ("disabled", images[3]),
                                  ("pressed", images[1]), ("focus", images[2]), ("active", images[1]), border=8)
@@ -40,7 +41,7 @@ class RoundedButton(ttk.Button):
             style.layout(name, [(element, {"sticky": "nswe", "children": [
                 ("Button.padding", {"sticky": "nswe", "children": [("Button.label", {"sticky": "nswe"})]})]})])
             style.configure(name, font=p["font"], foreground=p["fg"], anchor=p["anchor"])
-            style.map(name, foreground=[("disabled", "#929cab"), ("active", p["activeforeground"])])
+            style.map(name, foreground=[("disabled", palette.DIM), ("active", p["activeforeground"])])
             root._button_styles[key] = (name, images)
         super().configure(style=root._button_styles[key][0])
 
@@ -59,19 +60,23 @@ class RoundedButton(ttk.Button):
 
 
 def style_dropdowns(root, style):
-    images = [surface(root, "#222c39", "#435062", "#141b24"), surface(root, "#273542", "#60dfb3", "#141b24")]
+    prefix = "Dark" if palette.dark else "Light"
+    images = [surface(root, palette.CARD_BG, palette.CARD_BORDER, palette.BG), surface(root, palette.SELECT, "#715C99", palette.BG)]
     chevron = Image.new("RGBA", (60, 48))
-    ImageDraw.Draw(chevron).line([(5, 18), (17, 30), (29, 18)], fill="#c8d8e4", width=5)
+    ImageDraw.Draw(chevron).line([(5, 18), (17, 30), (29, 18)], fill=palette.TEXT, width=5)
     arrow = ImageTk.PhotoImage(chevron.resize((20, 16), Image.Resampling.LANCZOS), master=root)
-    root._combo_images = [*images, arrow]
-    style.element_create("Medal.chevron", "image", arrow)
-    style.element_create("Medal.combo", "image", images[0], ("focus", images[1]), ("active", images[1]), border=8)
-    style.layout("TCombobox", [("Medal.combo", {"sticky": "nswe", "children": [
-        ("Medal.chevron", {"side": "right"}),
+    if prefix + ".combo" not in style.element_names():
+        if not hasattr(root, "_combo_images"):
+            root._combo_images = {}
+        root._combo_images[prefix] = [*images, arrow]
+        style.element_create(prefix + ".chevron", "image", arrow)
+        style.element_create(prefix + ".combo", "image", images[0], ("focus", images[1]), ("active", images[1]), border=8)
+    style.layout("TCombobox", [(prefix + ".combo", {"sticky": "nswe", "children": [
+        (prefix + ".chevron", {"side": "right"}),
         ("Combobox.padding", {"sticky": "nswe", "children": [("Combobox.textarea", {"sticky": "nswe"})]})]})])
-    style.configure("TCombobox", padding=(9, 5), arrowsize=14, arrowcolor="#c6d9df", background="#222c39")
-    style.map("TCombobox", fieldbackground=[("readonly", "#222c39")], foreground=[("readonly", "#edf4fa")],
-              selectbackground=[("readonly", "#222c39")], selectforeground=[("readonly", "#edf4fa")])
-    for prop, value in dict(background="#222c39", foreground="#eef4fa", selectBackground="#315c51",
-                            selectForeground="#ffffff", font="{Segoe UI} 10", borderWidth=0).items():
+    style.configure("TCombobox", padding=(9, 5), arrowsize=14, arrowcolor="#c6d9df", background=palette.CARD_BG)
+    style.map("TCombobox", fieldbackground=[("readonly", palette.CARD_BG)], foreground=[("readonly", palette.TEXT)],
+              selectbackground=[("readonly", palette.CARD_BG)], selectforeground=[("readonly", palette.TEXT)])
+    for prop, value in dict(background=palette.CARD_BG, foreground=palette.TEXT, selectBackground=palette.ACTIVE,
+                            selectForeground=palette.TEXT, font="{Segoe UI} 10", borderWidth=0).items():
         root.option_add("*TCombobox*Listbox." + prop, value)
