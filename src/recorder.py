@@ -64,6 +64,29 @@ class ScreenRecorder:
         self._prune_stop = threading.Event()
         self._prune_thread: Optional[threading.Thread] = None
 
+    def _capture_encoder(self, binary, graph):
+        preferred = self.config.encoder
+        download = "hwdownload,format=bgra,format=nv12"
+        if preferred not in ("h264_nvenc", "hevc_nvenc"):
+            return preferred, download
+
+        # Hybrid laptops may capture on the integrated GPU. Test the actual
+        # display frames first, then transfer them before trying other encoders.
+        for encoder, filters in ((preferred, ""), (preferred, download),
+                                 ("h264_qsv", download), ("h264_amf", download)):
+            probe = [binary, "-v", "error", "-f", "lavfi", "-i", graph]
+            if filters:
+                probe += ["-vf", filters]
+            probe += ["-frames:v", "1", "-c:v", encoder, "-b:v", self.config.bitrate, "-f", "null", "-"]
+            try:
+                result = subprocess.run(probe, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, timeout=4)
+                if result.returncode == 0:
+                    return encoder, filters
+            except subprocess.TimeoutExpired:
+                continue
+        return "libx264", download
+
     def start_recording(self, *, resume=False):
         """Starts recording into 2-second .ts segments with GPU acceleration."""
         if self.is_recording():
@@ -91,6 +114,14 @@ class ScreenRecorder:
         cmd = [binary, "-hide_banner", "-loglevel", "error", "-nostats", "-y"]
 
         gpu_capture = method in ("auto", "ddagrab", "gfxcapture")
+        encoder, filters = self.config.encoder, ""
+        if gpu_capture:
+            graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
+            if method == "gfxcapture":
+                width, height = map(int, self.config.resolution.lower().split("x"))
+                graph = (f"gfxcapture=monitor_idx=0:width={width}:height={height}:"
+                         f"resize_mode=scale:max_framerate={self.config.fps}")
+            encoder, filters = self._capture_encoder(binary, graph)
         if self.config.audio_device == "system":
             from .playback_audio import PlaybackAudio
             self.playback = PlaybackAudio(
@@ -107,11 +138,6 @@ class ScreenRecorder:
             if method != "gfxcapture":
                 cmd += ["-thread_queue_size", "8"]
         if gpu_capture:
-            graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
-            if method == "gfxcapture":
-                width, height = map(int, self.config.resolution.lower().split("x"))
-                graph = (f"gfxcapture=monitor_idx=0:width={width}:height={height}:"
-                         f"resize_mode=scale:max_framerate={self.config.fps}")
             if self.playback:
                 graph += f",setpts=(RTCTIME/1000000-{epoch:.6f})/TB"
             cmd += [
@@ -146,31 +172,35 @@ class ScreenRecorder:
         if self.playback and not gpu_capture:
             cmd += ["-vf", f"setpts=PTS-{epoch:.6f}/TB"]
 
-        if gpu_capture and self.config.encoder not in ("h264_nvenc", "hevc_nvenc"):
-            cmd += ["-vf", "hwdownload,format=bgra"]
+        if filters:
+            cmd += ["-vf", filters]
 
         if self.playback:
             cmd += ["-r", str(self.config.fps), "-fps_mode", "cfr"]
 
+        if encoder != self.config.encoder:
+            print(f"[Recorder] Using {encoder} for this display ({self.config.encoder} unavailable).")
+
         # Hardware video encoder (NVENC / AMF / QSV)
-        if self.config.encoder in ("h264_nvenc", "hevc_nvenc"):
+        if encoder in ("h264_nvenc", "hevc_nvenc"):
             cmd += [
-                "-c:v", self.config.encoder,
+                "-c:v", encoder,
                 "-preset", "p1",        # Fastest NVENC hardware preset (zero CPU, minimal GPU)
                 "-tune", "ull",         # Ultra-low latency
                 "-rc", "cbr",
                 "-b:v", self.config.bitrate,
-                "-g", str(self.config.fps * 2),  # Keyframe every 2 seconds matching segment size
 
             ]
             if not gpu_capture:
                 cmd += ["-pix_fmt", "yuv420p"]
-        elif self.config.encoder == "h264_amf":
+        elif encoder == "h264_amf":
             cmd += ["-c:v", "h264_amf", "-quality", "speed", "-b:v", self.config.bitrate]
-        elif self.config.encoder == "h264_qsv":
+        elif encoder == "h264_qsv":
             cmd += ["-c:v", "h264_qsv", "-preset", "veryfast", "-b:v", self.config.bitrate]
         else:
-            cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-b:v", self.config.bitrate]
+            cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-tune", "zerolatency", "-b:v", self.config.bitrate]
+
+        cmd += ["-g", str(self.config.fps * 2)]  # Match the rolling segment duration.
 
         # Audio encoder if audio included
         if self.config.audio_device and self.config.audio_device.lower() != "none":
