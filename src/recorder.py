@@ -61,6 +61,8 @@ class ScreenRecorder:
         self.segment_dir: Path = self.config.temp_segment_dir
         self.start_wall_time: float = 0.0
         
+        self._camera_stop = threading.Event()
+        self._camera_thread = None
         self._prune_stop = threading.Event()
         self._prune_thread: Optional[threading.Thread] = None
 
@@ -93,6 +95,7 @@ class ScreenRecorder:
             print("[Recorder] Recording is already active.")
             return
 
+        self._stop_camera_session()
         if self.segment_dir.exists() and not self.retain_match and not resume:
             shutil.rmtree(self.segment_dir, ignore_errors=True)
         self.segment_dir.mkdir(parents=True, exist_ok=True)
@@ -239,10 +242,6 @@ class ScreenRecorder:
         if self.playback:
             self.playback.start(self.process.stdin, origin)
 
-        if self.config.overlay_enabled and self.config.overlay_device:
-            self.webcam = WebcamRecorder(self.config, self.segment_dir)
-            self.webcam.start_recording(resume=resume)
-
         time.sleep(0.5)
         if self.process.poll() is not None:
             if self.playback:
@@ -254,12 +253,47 @@ class ScreenRecorder:
             print(f"[Recorder] Error: FFmpeg capture failed (exit {self.process.returncode}): {err[-300:]}")
             return
 
+        if self.config.overlay_enabled and self.config.overlay_device:
+            self._camera_stop.clear()
+            first_video = self.segment_dir / f"seg_{self.first_segment:06d}.ts"
+            self._camera_thread = threading.Thread(
+                target=self._camera_session, args=(self.process, first_video, resume),
+                name="GameplayWebcam", daemon=True)
+            self._camera_thread.start()
+
         if self.retain_match:
             return
         self._prune_stop.clear()
         self._prune_thread = threading.Thread(target=self._prune_loop, daemon=True, name="SegmentPruner")
         self._prune_thread.start()
         print(f"[Recorder] Active recording into: {self.segment_dir}")
+
+    def _camera_session(self, gameplay, first_video, resume):
+        camera = WebcamRecorder(self.config, self.segment_dir)
+        try:
+            while gameplay.poll() is None and self.config.overlay_enabled and not self._camera_stop.is_set():
+                if self.webcam is None:
+                    try:
+                        ready = first_video.stat().st_size > 0
+                    except FileNotFoundError:
+                        ready = False
+                    if ready:
+                        self.webcam = camera
+                        camera.start_recording(resume=resume)
+                if self._camera_stop.wait(0.2):
+                    break
+        finally:
+            camera.stop_recording()
+
+    def disable_webcam(self):
+        self._camera_stop.set()
+
+    def _stop_camera_session(self):
+        self.disable_webcam()
+        if self._camera_thread:
+            self._camera_thread.join()
+            self._camera_thread = None
+        self.webcam = None
 
     def get_completed_segments(self) -> List[Path]:
         """Returns sorted list of completed .ts segments, excluding the newest active one."""
@@ -315,9 +349,7 @@ class ScreenRecorder:
         self._prune_stop.set()
         if self._prune_thread:
             self._prune_thread.join()
-        if self.webcam:
-            self.webcam.stop_recording()
-            self.webcam = None
+        self._stop_camera_session()
         if self.playback:
             self.playback.done.set()
         if not self.is_recording():

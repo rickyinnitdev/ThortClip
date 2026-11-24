@@ -909,6 +909,8 @@ class RecorderWindow:
 
     def on_toggle_overlay(self, val: bool):
         self.app.config.set_overlay_settings(enabled=val)
+        if not val:
+            self.app.recorder.disable_webcam()
         self.redraw_preview_canvas()
 
     def on_toggle_virtual(self, val: bool):
