@@ -7,6 +7,7 @@ from typing import Callable, Optional
 
 ROUND_ENDED_REGEX = re.compile(r"AShooterGameState::OnRoundEnded for round '(\d+)'")
 MATCH_STARTED_REGEX = re.compile(r"LogShooterGameState: (?:Replicated NetServerMaxTickRate|Warning: Gameplay started at)")
+MATCH_MAP_REGEX = re.compile(r"LogMapLoadModel: Update: .*?\[Local World: TRUE \|[^\]]*\] \[Match Setup: TRUE \|")
 LOG_TIMESTAMP_REGEX = re.compile(r"\[(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}:\d{3})\]")
 
 class LogWatcher:
@@ -28,6 +29,7 @@ class LogWatcher:
         self.current_round = 0
         self.in_match = False
         self._running = False
+        self.log_status = ""
         self._thread: Optional[threading.Thread] = None
         self._file_handle = None
 
@@ -51,6 +53,7 @@ class LogWatcher:
         while self._running:
             try:
                 stat = self.log_path.stat()
+                self.log_status = ""
                 file_id = (stat.st_dev, stat.st_ino)
                 if self._file_handle is None or identity != file_id or stat.st_size < self._file_handle.tell():
                     if self._file_handle:
@@ -74,7 +77,11 @@ class LogWatcher:
                     self._process_line(line.strip())
                 time.sleep(0.2)
             except FileNotFoundError:
+                self.log_status = "Valorant log not found"
                 initial = False
+                time.sleep(1)
+            except PermissionError:
+                self.log_status = "Cannot read Valorant log"
                 time.sleep(1)
             except Exception as error:
                 if self._running:
@@ -124,7 +131,7 @@ class LogWatcher:
             return
 
         # Check for match / round start
-        if MATCH_STARTED_REGEX.search(line):
+        if MATCH_STARTED_REGEX.search(line) or MATCH_MAP_REGEX.search(line):
             if not self.in_match:
                 self.in_match = True
                 print("[LogWatcher] Match / round gameplay start detected!")
