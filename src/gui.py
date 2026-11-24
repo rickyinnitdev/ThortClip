@@ -117,7 +117,8 @@ class RecorderWindow:
         self.manual_update = False
         self.pending_update = None
         self.build_interface("library")
-        self.repaint_pending = False
+        self.repaint_pending = None
+        root.bind("<Configure>", self._schedule_repaint, add="+")
         root.bind("<Activate>", self._schedule_repaint, add="+")
         root.bind("<Map>", self._schedule_repaint, add="+")
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -126,12 +127,14 @@ class RecorderWindow:
             self.root.after(2500, self.check_update)
 
     def _schedule_repaint(self, event):
-        if event.widget is self.root and not self.repaint_pending:
-            self.repaint_pending = True
-            self.root.after_idle(self._repaint_window)
+        if event.widget is not self.root:
+            return
+        if self.repaint_pending is not None:
+            self.root.after_cancel(self.repaint_pending)
+        self.repaint_pending = self.root.after(80, self._repaint_window)
 
     def _repaint_window(self):
-        self.repaint_pending = False
+        self.repaint_pending = None
         if self.root.winfo_viewable():
             # Invalidate the native frame and all Tk child windows on restore.
             user32 = ctypes.windll.user32
@@ -139,8 +142,8 @@ class RecorderWindow:
             get_parent = user32.GetParent
             get_parent.restype = ctypes.c_void_p
             frame = ctypes.c_void_p(get_parent(client) or client.value)
-            # RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN
-            user32.RedrawWindow(frame, None, None, 0x481)
+            # RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN
+            user32.RedrawWindow(frame, None, None, 0x485)
 
     def build_interface(self, view_name):
         root = self.root
@@ -459,7 +462,7 @@ class RecorderWindow:
 
     def _layout_card_rows(self):
         columns = getattr(self, "_library_columns", 2)
-        rows = (len(self._card_widgets) + columns - 1) // columns
+        rows = (len(self._card_paths) + columns - 1) // columns
         for row in range(max(rows, getattr(self, "_card_rows", 0))):
             self._card_grid.rowconfigure(row, minsize=self._card_pitch if row < rows else 0)
         self._card_rows = rows
@@ -475,11 +478,14 @@ class RecorderWindow:
         row = int(fraction * self._card_rows)
         visible_rows = self.clips_canvas.winfo_height() // self._card_pitch + 3
         start = max(0, row - 1) * columns
-        stop = min(len(self._card_widgets), (row + visible_rows) * columns)
+        stop = min(len(self._card_paths), (row + visible_rows) * columns)
         visible = set(range(start, stop))
         for i in self._mapped_cards - visible:
-            self._card_widgets[i].grid_remove()
+            self._thumb_canvases.pop(self._card_paths[i], None)
+            self._card_widgets.pop(i).destroy()
         for i in (visible if reposition else visible - self._mapped_cards):
+            if i not in self._card_widgets:
+                self._card_widgets[i] = self._create_card(self._card_paths[i])
             self._card_widgets[i].grid(row=i // columns, column=i % columns, padx=8, pady=8, sticky="nsew")
         self._mapped_cards = visible
 
@@ -554,7 +560,7 @@ class RecorderWindow:
         self.update_storage_meter()
 
     def render_clip_cards(self):
-        self._card_widgets = []
+        self._card_widgets = {}
         self._mapped_cards = set()
         self._card_rows = 0
         self._thumb_canvases = {}
@@ -595,104 +601,108 @@ class RecorderWindow:
         for c in range(cols):
             grid_frame.columnconfigure(c, weight=1, uniform="clipcol")
 
-        for clip_path in clips:
-            meta = self.get_clip_metadata(clip_path)
-
-            card = ctk.CTkFrame(grid_frame, fg_color=palette.CARD_BG, bg_color=palette.BG, border_width=2, border_color=palette.CARD_BORDER, corner_radius=14)
-            self._card_widgets.append(card)
-
-
-            # Thumbnail Frame
-            thumb_frame = tk.Frame(card, bg="#000000", height=140)
-            thumb_frame.pack(fill="x", padx=6, pady=(6, 0))
-            thumb_frame.pack_propagate(False)
-
-            thumb_canvas = tk.Canvas(thumb_frame, bg="#000000", highlightthickness=0, cursor="hand2")
-            thumb_canvas.pack(fill="both", expand=True)
-
-            self._thumb_canvases[clip_path] = thumb_canvas
-            # Load thumbnail or placeholder
-            photo = self.thumbnails.get_thumbnail(clip_path, width=280, height=140)
-            thumb_canvas.bind("<Configure>", lambda e: e.widget.coords("preview", e.width / 2, e.height / 2) if e.widget.find_withtag("preview") else None)
-            if photo:
-                thumb_canvas.create_image(140, 70, image=photo, tags="preview")
-                thumb_canvas.image = photo
-            else:
-                thumb_canvas.create_rectangle(0, 0, 280, 140, fill="#121620", outline="", tags="placeholder")
-                thumb_canvas.create_text(140, 60, tags="placeholder", text="▶", font=("Segoe UI", 22), fill=palette.MUTED)
-
-            # Badges over thumbnail
-            kills = meta["kills"]
-            if kills > 0:
-                badge_bg = palette.ORANGE if kills >= 3 else palette.ACCENT
-                badge_text = "ACE" if kills >= 5 else f"{kills}K"
-                # Rounded pill badge
-                thumb_canvas.create_rectangle(10, 10, 46, 28, fill=badge_bg, outline="")
-                thumb_canvas.create_text(28, 19, text=badge_text, font=("Segoe UI", 9, "bold"), fill=palette.TEXT)
-
-            # Duration badge on bottom right
-            dur_str = meta.get("duration_str")
-            if dur_str:
-                thumb_canvas.create_rectangle(226, 114, 270, 132, fill="#0b0e14", outline="")
-                thumb_canvas.create_text(248, 123, text=dur_str, font=("Segoe UI", 8, "bold"), fill="#FFFFFF")
-
-            # Info Details
-            info = tk.Frame(card, bg=palette.CARD_BG, padx=12, pady=10)
-            info.pack(fill="x", padx=5, pady=(0, 6))
-
-            title_text = f"{kills}K Highlight" if kills > 0 else "Match Clip"
-            if meta["round"]:
-                title_text += f" (Round {meta['round']})"
-
-            tk.Label(info, text=title_text, font=("Georgia", 12, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
-
-            sub_line = tk.Frame(info, bg=palette.CARD_BG)
-            sub_line.pack(fill="x", pady=(2, 6))
-            tk.Label(sub_line, text=meta["date_str"], font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(side="left")
-            tk.Label(sub_line, text=f"• {meta['size_str']}", font=("Segoe UI", 8), fg=palette.DIM, bg=palette.CARD_BG).pack(side="left", padx=4)
-
-            # Action Buttons Row
-            actions = tk.Frame(info, bg=palette.CARD_BG)
-            actions.pack(fill="x")
-
-            play_btn = RoundedButton(
-                actions, text="▶ Play", font=("Segoe UI", 9, "bold"),
-                fg=palette.TEXT, bg=palette.ACCENT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
-                relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
-                command=lambda p=clip_path: self.play_clip(p)
-            )
-            play_btn.pack(side="left")
-
-            copy_btn = RoundedButton(
-                actions, text="Copy", font=("Segoe UI", 9),
-                fg=palette.MUTED, bg=palette.SECONDARY, activebackground=palette.CARD_HOVER, activeforeground=palette.TEXT,
-                relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
-                command=lambda p=clip_path: self.copy_clip_path(p)
-            )
-            copy_btn.pack(side="left", padx=6)
-
-            RoundedButton(
-                actions, text="Open clip in folder", font=("Segoe UI", 9),
-                fg=palette.MUTED, bg=palette.SECONDARY, activebackground=palette.CARD_HOVER, activeforeground=palette.TEXT,
-                relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
-                command=lambda p=clip_path: show_clip_in_folder(p)
-            ).pack(side="left")
-
-            del_btn = RoundedButton(
-                actions, text="🗑️", font=("Segoe UI", 8),
-                fg=palette.MUTED, bg=palette.SECONDARY, activebackground=RED, activeforeground=palette.TEXT,
-                relief="flat", borderwidth=0, padx=6, pady=3, cursor="hand2",
-                command=lambda p=clip_path: self.delete_clip(p)
-            )
-            del_btn.pack(side="right")
-
-            # Click thumbnail to play
-            thumb_canvas.bind("<Button-1>", lambda e, p=clip_path: self.play_clip(p))
-
-        # Measure one card after its children have requested layout.
-        self._card_widgets[0].update_idletasks()
-        self._card_pitch = self._card_widgets[0].winfo_reqheight() + 16
+        self._card_paths = clips
+        if not hasattr(self, "_card_pitch"):
+            sample = self._create_card(clips[0])
+            sample.update_idletasks()
+            self._card_pitch = sample.winfo_reqheight() + 16
+            self._thumb_canvases.pop(clips[0], None)
+            sample.destroy()
         self._layout_card_rows()
+
+    def _create_card(self, clip_path):
+        meta = self.get_clip_metadata(clip_path)
+
+        card = ctk.CTkFrame(self._card_grid, fg_color=palette.CARD_BG, bg_color=palette.BG, border_width=2, border_color=palette.CARD_BORDER, corner_radius=14)
+
+        # Thumbnail Frame
+        thumb_frame = tk.Frame(card, bg="#000000", height=140)
+        thumb_frame.pack(fill="x", padx=6, pady=(6, 0))
+        thumb_frame.pack_propagate(False)
+
+        thumb_canvas = tk.Canvas(thumb_frame, bg="#000000", highlightthickness=0, cursor="hand2")
+        thumb_canvas.pack(fill="both", expand=True)
+
+        self._thumb_canvases[clip_path] = thumb_canvas
+        # Load thumbnail or placeholder
+        photo = self.thumbnails.get_thumbnail(clip_path, width=280, height=140)
+        thumb_canvas.bind("<Configure>", lambda e: e.widget.coords("preview", e.width / 2, e.height / 2) if e.widget.find_withtag("preview") else None)
+        if photo:
+            thumb_canvas.create_image(140, 70, image=photo, tags="preview")
+            thumb_canvas.image = photo
+        else:
+            thumb_canvas.create_rectangle(0, 0, 280, 140, fill="#121620", outline="", tags="placeholder")
+            thumb_canvas.create_text(140, 60, tags="placeholder", text="▶", font=("Segoe UI", 22), fill=palette.MUTED)
+
+        # Badges over thumbnail
+        kills = meta["kills"]
+        if kills > 0:
+            badge_bg = palette.ORANGE if kills >= 3 else palette.ACCENT
+            badge_text = "ACE" if kills >= 5 else f"{kills}K"
+            # Rounded pill badge
+            thumb_canvas.create_rectangle(10, 10, 46, 28, fill=badge_bg, outline="")
+            thumb_canvas.create_text(28, 19, text=badge_text, font=("Segoe UI", 9, "bold"), fill=palette.TEXT)
+
+        # Duration badge on bottom right
+        dur_str = meta.get("duration_str")
+        if dur_str:
+            thumb_canvas.create_rectangle(226, 114, 270, 132, fill="#0b0e14", outline="")
+            thumb_canvas.create_text(248, 123, text=dur_str, font=("Segoe UI", 8, "bold"), fill="#FFFFFF")
+
+        # Info Details
+        info = tk.Frame(card, bg=palette.CARD_BG, padx=12, pady=10)
+        info.pack(fill="x", padx=5, pady=(0, 6))
+
+        title_text = f"{kills}K Highlight" if kills > 0 else "Match Clip"
+        if meta["round"]:
+            title_text += f" (Round {meta['round']})"
+
+        tk.Label(info, text=title_text, font=("Georgia", 12, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
+
+        sub_line = tk.Frame(info, bg=palette.CARD_BG)
+        sub_line.pack(fill="x", pady=(2, 6))
+        tk.Label(sub_line, text=meta["date_str"], font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(side="left")
+        tk.Label(sub_line, text=f"• {meta['size_str']}", font=("Segoe UI", 8), fg=palette.DIM, bg=palette.CARD_BG).pack(side="left", padx=4)
+
+        # Action Buttons Row
+        actions = tk.Frame(info, bg=palette.CARD_BG)
+        actions.pack(fill="x")
+
+        play_btn = RoundedButton(
+            actions, text="▶ Play", font=("Segoe UI", 9, "bold"),
+            fg=palette.TEXT, bg=palette.ACCENT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
+            relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
+            command=lambda p=clip_path: self.play_clip(p)
+        )
+        play_btn.pack(side="left")
+
+        copy_btn = RoundedButton(
+            actions, text="Copy", font=("Segoe UI", 9),
+            fg=palette.MUTED, bg=palette.SECONDARY, activebackground=palette.CARD_HOVER, activeforeground=palette.TEXT,
+            relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
+            command=lambda p=clip_path: self.copy_clip_path(p)
+        )
+        copy_btn.pack(side="left", padx=6)
+
+        RoundedButton(
+            actions, text="Open clip in folder", font=("Segoe UI", 9),
+            fg=palette.MUTED, bg=palette.SECONDARY, activebackground=palette.CARD_HOVER, activeforeground=palette.TEXT,
+            relief="flat", borderwidth=0, padx=8, pady=3, cursor="hand2",
+            command=lambda p=clip_path: show_clip_in_folder(p)
+        ).pack(side="left")
+
+        del_btn = RoundedButton(
+            actions, text="🗑️", font=("Segoe UI", 8),
+            fg=palette.MUTED, bg=palette.SECONDARY, activebackground=RED, activeforeground=palette.TEXT,
+            relief="flat", borderwidth=0, padx=6, pady=3, cursor="hand2",
+            command=lambda p=clip_path: self.delete_clip(p)
+        )
+        del_btn.pack(side="right")
+
+        # Click thumbnail to play
+        thumb_canvas.bind("<Button-1>", lambda e, p=clip_path: self.play_clip(p))
+
+        return card
 
     def build_player_view(self):
         from .clip_player import ClipPlayerView
@@ -1533,7 +1543,7 @@ class RecorderWindow:
         self.shell.destroy()
         self._library_snapshot = None
         self._camera_scan_started = self._audio_scan_started = False
-        self._card_widgets = []
+        self._card_widgets = {}
         self._thumb_canvases = {}
         self.last_state = None
         self.build_interface("settings")
@@ -1707,13 +1717,13 @@ class RecorderWindow:
             ready_thumb = self.thumbnails.get_ready()
             if not ready_thumb:
                 break
-            vpath, cpath, pil_img, dur_str = ready_thumb
+            vpath, dur_str, thumbnail_ready = ready_thumb
             k = str(vpath.resolve())
             if k in self._clip_meta_cache and dur_str:
                 self._clip_meta_cache[k]["duration_str"] = dur_str
             # Refresh grid if in library view
             canvas = getattr(self, "_thumb_canvases", {}).get(vpath)
-            if canvas is not None:
+            if canvas is not None and thumbnail_ready:
                 photo = self.thumbnails.get_thumbnail(vpath, 280, 140)
                 if photo:
                     canvas.delete("placeholder", "preview")

@@ -1,11 +1,12 @@
 """Asynchronous thumbnail generation and caching for clip cards."""
+from collections import OrderedDict
 import hashlib
 import os
 import queue
 import subprocess
 import threading
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 
 from PIL import Image, ImageTk
 
@@ -17,7 +18,8 @@ class ThumbnailManager:
             cache_dir = Path("temp/thumbnails").resolve()
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._memory_cache: Dict[str, ImageTk.PhotoImage] = {}
+        self._memory_cache: OrderedDict[str, ImageTk.PhotoImage] = OrderedDict()
+        self._pending = set()
         self._work_queue = queue.Queue()
         self._ready_queue = queue.Queue()
         self._worker_thread = threading.Thread(target=self._worker, daemon=True, name="ThumbnailWorker")
@@ -35,6 +37,7 @@ class ThumbnailManager:
         cache_key = str(cache_file)
 
         if cache_key in self._memory_cache:
+            self._memory_cache.move_to_end(cache_key)
             return self._memory_cache[cache_key]
 
         if cache_file.is_file():
@@ -43,18 +46,24 @@ class ThumbnailManager:
                 img = img.resize((width, height), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 self._memory_cache[cache_key] = photo
+                if len(self._memory_cache) > 24:
+                    self._memory_cache.popitem(last=False)
                 return photo
             except Exception:
                 pass
 
         # Queue background generation
-        self._work_queue.put((video_path, cache_file, width, height))
+        if cache_file not in self._pending:
+            self._pending.add(cache_file)
+            self._work_queue.put((video_path, cache_file, width, height))
         return None
 
     def get_ready(self) -> Optional[tuple]:
         """Returns (video_path, PhotoImage) if ready, or None."""
         try:
-            return self._ready_queue.get_nowait()
+            path, cache_file, duration = self._ready_queue.get_nowait()
+            self._pending.discard(cache_file)
+            return path, duration, cache_file.is_file()
         except queue.Empty:
             return None
 
@@ -90,10 +99,6 @@ class ThumbnailManager:
                 except Exception:
                     pass
 
-                if cache_file.is_file():
-                    img = Image.open(cache_file)
-                    img = img.resize((width, height), Image.Resampling.LANCZOS)
-                    # Note: PhotoImage must be created in main thread, so pass the PIL Image
-                    self._ready_queue.put((video_path, str(cache_file), img, duration_str))
+                self._ready_queue.put((video_path, cache_file, duration_str))
             except Exception:
-                pass
+                self._ready_queue.put((video_path, cache_file, None))
