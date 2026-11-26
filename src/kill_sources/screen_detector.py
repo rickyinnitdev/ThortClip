@@ -128,11 +128,23 @@ class LocalKillFeed:
         return events if now - self.last_spectator > 0.5 else 0
 
 
+def detector_output(monitor_handle):
+    if monitor_handle:
+        # DXcam 0.3.0 exposes monitor handles in its factory's DXGI outputs.
+        for device_idx, outputs in enumerate(vars(dxcam)["__factory"].outputs):
+            for output_idx, output in enumerate(outputs):
+                if output.hmonitor == monitor_handle:
+                    return device_idx, output_idx
+        raise RuntimeError("Recording display is unavailable to the kill detector")
+    return 0, 0
+
+
 class ScreenDetectionKillSource(KillSourceBase):
     """Detect personal kills in the top-right Valorant kill feed."""
 
     def __init__(self, config: Config):
         self.config = config
+        self.monitor_handle = None
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._callback: Optional[Callable[[float, Optional[int], Dict[str, Any]], None]] = None
@@ -160,8 +172,8 @@ class ScreenDetectionKillSource(KillSourceBase):
 
         camera = None
         try:
-            # Connect directly to GPU VRAM on Output 0 (Primary 240Hz monitor)
-            camera = dxcam.create(device_idx=0, output_idx=0, output_color="BGRA")
+            device, output = detector_output(self.monitor_handle)
+            camera = dxcam.create(device_idx=device, output_idx=output, output_color="BGRA")
             mon_w = camera.width
             mon_h = camera.height
             scale = mon_h / 1080

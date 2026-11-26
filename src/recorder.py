@@ -48,7 +48,7 @@ def get_primary_display_info():
         return dm.dmPelsWidth, dm.dmPelsHeight, max(60, dm.dmDisplayFrequency)
     return 1920, 1080, 240
 
-def gfxcapture_monitor():
+def valorant_monitor_handle():
     """Record the display containing the game when its window already exists."""
     user32 = ctypes.windll.user32
     find_window = user32.FindWindowExW
@@ -65,8 +65,8 @@ def gfxcapture_monitor():
         monitor_from_window.restype = wintypes.HANDLE
         monitor = monitor_from_window(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
         if monitor:
-            return f"hmonitor={monitor}"
-    return "monitor_idx=0"
+            return monitor
+    return None
 
 
 class ScreenRecorder:
@@ -74,6 +74,7 @@ class ScreenRecorder:
 
     def __init__(self, config: Config):
         self.config = config
+        self.monitor_handle = None
         self.keep_from = None
         self.retain_match = False
         self.playback = None
@@ -143,7 +144,9 @@ class ScreenRecorder:
             graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
             if method == "gfxcapture":
                 width, height = map(int, self.config.resolution.lower().split("x"))
-                graph = (f"gfxcapture={gfxcapture_monitor()}:width={width}:height={height}:"
+                self.monitor_handle = valorant_monitor_handle()
+                selector = f"hmonitor={self.monitor_handle}" if self.monitor_handle else "monitor_idx=0"
+                graph = (f"gfxcapture={selector}:width={width}:height={height}:"
                          f"resize_mode=scale:max_framerate={self.config.fps}")
             encoder, filters = self._capture_encoder(binary, graph)
         if self.config.audio_device == "system":

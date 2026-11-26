@@ -130,6 +130,7 @@ class ThortClipApp:
                     if self.screen_detector is None:
                         from .kill_sources.screen_detector import ScreenDetectionKillSource
                         self.screen_detector = ScreenDetectionKillSource(self.config)
+                    self.screen_detector.monitor_handle = self.recorder.monitor_handle
                     self.screen_detector.start(on_trigger=self._on_local_kill)
 
     def _on_match_ended(self):
