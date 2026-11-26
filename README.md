@@ -1,10 +1,24 @@
-# ThortClip
+<h1 align="center">ThortClip</h1>
 
-ThortClip is a local VALORANT highlight recorder for Windows x64. It reads the kill feed and saves one MP4 per round where it detects your kills, from the first kill through the last. It skips rounds with no detected personal kills. Press **F8** during recording to save a play manually. Automatic clipping works without a Riot account connection or API key.
+<p align="center">A local VALORANT highlight recorder for Windows. Play the round, then replay your kills in one MP4.</p>
 
-**[Download ThortClip for Windows x64](https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe)** · [All releases](https://github.com/rickyinnitdev/ThortClip/releases) · [GitHub Packages](https://github.com/rickyinnitdev/ThortClip/packages)
+![ThortClip Clips Library showing round highlights with kill counts, playback controls, and an All clips or Multi-kills filter](docs/images/clips-library.png)
+
+<p align="center">
+  <strong><a href="https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe">Download for Windows x64</a></strong> ·
+  <a href="https://github.com/rickyinnitdev/ThortClip/releases">All releases</a> ·
+  <a href="https://github.com/rickyinnitdev/ThortClip/packages">GitHub Packages</a>
+</p>
+<p align="center">
+  <a href="#record-your-first-clip">Quick start</a> ·
+  <a href="#browse-your-highlights">Clips Library</a> ·
+  <a href="#customize-your-recordings">Recording settings</a> ·
+  <a href="#support-thortclip">Support ThortClip</a>
+</p>
 
 ## Record your first clip
+
+ThortClip reads the kill feed locally and saves one highlight from your first detected kill through your last in each round. It skips zero-kill rounds. Automatic highlights work without a Riot account connection or API key.
 
 1. Run **ThortClip-Setup-x64.exe** and open **ThortClip** from the Start menu. The installer includes Python, FFmpeg, and the media player.
 2. Leave the app open and enter a match. **Capture Status** shows when recording is active. You can also choose **Start recording** to try it before a match.
@@ -42,6 +56,10 @@ The desktop interface is in [src/gui.py](src/gui.py), capture and round handling
 The installed profile lives at `%LOCALAPPDATA%\ThortClip\profile\config.json`. On upgrade, the launcher copies an existing profile on first use. A source checkout uses a local `config.json` in the repository root. For recorder tests, use an isolated configuration and temporary output folders; starting capture can clear the configured segment directory.
 
 For authorized post-match results, configure `THORTCLIP_RIOT_API_KEY`, `THORTCLIP_PLAYER_PUUID`, and `THORTCLIP_VAL_REGION` for the approved application and opted-in player. With that integration enabled, pending match recordings are retained while the app waits for results.
+
+## Support ThortClip
+
+Found a recording or playback issue? Include your capture settings and what happened so I can reproduce it. [Report an issue](https://github.com/rickyinnitdev/ThortClip/issues/new)
 
 ## License
 
