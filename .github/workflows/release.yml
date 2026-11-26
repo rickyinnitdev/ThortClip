@@ -48,9 +48,15 @@ jobs:
           @{repository=$env:GITHUB_REPOSITORY;build=[long]$env:GITHUB_RUN_NUMBER} | ConvertTo-Json | Set-Content dist/ThortClip/release.json -Encoding utf8NoBOM
           python packaging/bundle.py dist/ThortClip "$media/ffmpeg.exe" "$media/ffprobe.exe" "$media/ffplay.exe" "$media/vlc" release/ThortClip-Setup-x64.exe
           if ($LASTEXITCODE) { throw "Packaging failed" }
+          $installer = 'release/ThortClip-Setup-x64.exe'
+          $zip = 'release/ThortClip-Setup-x64.zip'
+          Compress-Archive -LiteralPath $installer -DestinationPath $zip -CompressionLevel Fastest
+          $verify = Join-Path $env:RUNNER_TEMP zip-check
+          Expand-Archive -LiteralPath $zip -DestinationPath $verify
+          if ((Get-FileHash "$verify/ThortClip-Setup-x64.exe").Hash -ne (Get-FileHash $installer).Hash) { throw "Archived installer checksum mismatch" }
           # Older clients locate the installer by its original asset name.
           Copy-Item release/ThortClip-Setup-x64.exe release/ThotClip-Setup-x64.exe
-          gh release create "build-$env:GITHUB_RUN_NUMBER" release/ThortClip-Setup-x64.exe release/ThotClip-Setup-x64.exe --title "ThortClip build $env:GITHUB_RUN_NUMBER" --target "$env:GITHUB_SHA" --generate-notes --latest
+          gh release create "build-$env:GITHUB_RUN_NUMBER" release/ThortClip-Setup-x64.exe release/ThotClip-Setup-x64.exe $zip --title "ThortClip build $env:GITHUB_RUN_NUMBER" --target "$env:GITHUB_SHA" --generate-notes --latest
       - name: Publish installer to GitHub Packages
         env:
           GITHUB_TOKEN: ${{ github.token }}

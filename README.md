@@ -5,7 +5,7 @@
 ![ThortClip Clips Library showing round highlights with kill counts, playback controls, and an All clips or Multi-kills filter](docs/images/clips-library.png)
 
 <p align="center">
-  <strong><a href="https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe">Download for Windows x64</a></strong> ·
+  <strong><a href="https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.zip">Download for Windows x64 (ZIP)</a></strong> ·
   <a href="https://github.com/rickyinnitdev/ThortClip/releases">All releases</a> ·
   <a href="https://github.com/rickyinnitdev/ThortClip/packages">GitHub Packages</a>
 </p>
@@ -20,7 +20,7 @@
 
 ThortClip reads the kill feed locally and saves one highlight from your first detected kill through your last in each round. It skips zero-kill rounds. Automatic highlights work without a Riot account connection or API key.
 
-1. Run **ThortClip-Setup-x64.exe** and open **ThortClip** from the Start menu. The installer includes Python, FFmpeg, and the media player.
+1. Extract the downloaded ZIP, run **ThortClip-Setup-x64.exe**, and open **ThortClip** from the Start menu. The installer includes Python, FFmpeg, and the media player.
 2. Leave the app open and enter a match. **Capture Status** shows when recording is active. You can also choose **Start recording** to try it before a match.
 3. Press **F8** during recording, or finish a round with a personal kill. Open **Clips Library** to play the highlight. Click a kill marker to jump to that moment, or choose **Open clip in folder** to select the MP4 in Explorer.
 
