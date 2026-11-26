@@ -1,14 +1,8 @@
 # ThortClip
 
-ThortClip is a local VALORANT highlight recorder for Windows x64. It reads the kill feed and saves one MP4 per round where it detects your kills, from the first kill through the last. Rounds with zero detected personal kills produce zero automatic clips. Press **F8** during recording to save a play manually. Automatic clipping works without a Riot account connection or API key.
+ThortClip is a local VALORANT highlight recorder for Windows x64. It reads the kill feed and saves one MP4 per round where it detects your kills, from the first kill through the last. It skips rounds with no detected personal kills. Press **F8** during recording to save a play manually. Automatic clipping works without a Riot account connection or API key.
 
 **[Download ThortClip for Windows x64](https://github.com/rickyinnitdev/ThortClip/releases/latest/download/ThortClip-Setup-x64.exe)** · [All releases](https://github.com/rickyinnitdev/ThortClip/releases) · [GitHub Packages](https://github.com/rickyinnitdev/ThortClip/packages)
-
-## Project status · Build 11
-
-- **Automatic highlights:** In a 20-round competitive match on Lotus, the saved highlight counts added up to all 17 kills on the scoreboard. The library example below uses that match.
-- **Recording and updates:** ThortClip recognizes a match already in progress when you open it. It checks encoder support using frames from the captured display, starts the optional webcam alongside gameplay capture, and lets you restart from the sidebar when an update is ready.
-- **Window switching:** Build 11 disables Windows transition animations for the ThortClip window to address reports of a faded copy staying on screen after switching apps. One controlled Windows test passed 12 switch and minimize/restore checks. Confirmation during everyday play is still pending. [Build 11 release](https://github.com/rickyinnitdev/ThortClip/releases/tag/build-11)
 
 ## Record your first clip
 
@@ -18,13 +12,11 @@ ThortClip is a local VALORANT highlight recorder for Windows x64. It reads the k
 
 On a fresh install, clips are saved under **Videos → ThortClip**. Check **Settings → Clips Output Directory** for the actual location, especially after upgrading from an earlier version.
 
-## Find your 1K clips
+## Browse your highlights
 
-In **Clips Library**, select **All clips** to see single-kill rounds. **Multi-kills** shows only clips with two or more kills. Switching filters only changes what you see in the library. ThortClip still saves 1K rounds while the filter is selected.
+Open **Clips Library** and select **All clips** to see every saved highlight, including single-kill rounds. Each automatic clip has a badge showing how many of your kills ThortClip detected in that round. Select **Multi-kills** to show rounds with two or more detected kills. ThortClip keeps saving single-kill highlights while this filter is active.
 
-Each automatic highlight covers one round. The badge tells you how many personal kills ThortClip detected in that round. For example, a match with three 1K rounds, four 2K rounds, and two 3K rounds produces **9 clips covering 17 kills**. The **Multi-kills** view shows six of those clips, covering 14 kills.
-
-## Make it yours
+## Customize your recordings
 
 | What you want | Where to find it |
 | --- | --- |
