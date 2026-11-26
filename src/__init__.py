@@ -1,1 +1,1 @@
-# MedalRea Lightweight Clipper
+# ThortClip Lightweight Clipper

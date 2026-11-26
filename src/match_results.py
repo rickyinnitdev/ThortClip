@@ -10,9 +10,9 @@ from uuid import UUID
 
 class MatchResults:
     def __init__(self, config, cutter):
-        self.key = os.getenv("MEDALREA_RIOT_API_KEY")
-        self.player = os.getenv("MEDALREA_PLAYER_PUUID")
-        self.region = os.getenv("MEDALREA_VAL_REGION", "").lower()
+        self.key = os.getenv("THORTCLIP_RIOT_API_KEY", os.getenv("MEDALREA_RIOT_API_KEY"))
+        self.player = os.getenv("THORTCLIP_PLAYER_PUUID", os.getenv("MEDALREA_PLAYER_PUUID"))
+        self.region = os.getenv("THORTCLIP_VAL_REGION", os.getenv("MEDALREA_VAL_REGION", "")).lower()
         self.enabled = bool(self.key and self.player and self.region in {"ap", "br", "eu", "kr", "latam", "na"})
         self.root = config.temp_segment_dir.parent / "pending-matches"
         self.cutter = cutter

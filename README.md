@@ -47,9 +47,9 @@ Click **Check for update** below Settings in the sidebar to check immediately. T
 
 The desktop interface is in [src/gui.py](src/gui.py), capture and round handling in [src/main.py](src/main.py), and the local kill-feed detector in [src/kill_sources/screen_detector.py](src/kill_sources/screen_detector.py). The [Windows release workflow](.github/workflows/release.yml) specifies the build dependencies and packages the installer.
 
-The installed profile lives at `%LOCALAPPDATA%\MedalRea\profile\config.json`. The legacy folder name preserves settings across upgrades. A source checkout uses a local `config.json` in the repository root. For recorder tests, use an isolated configuration and temporary output folders; starting capture can clear the configured segment directory.
+The installed profile lives at `%LOCALAPPDATA%\ThortClip\profile\config.json`. On upgrade, the launcher copies an existing profile on first use. A source checkout uses a local `config.json` in the repository root. For recorder tests, use an isolated configuration and temporary output folders; starting capture can clear the configured segment directory.
 
-For authorized post-match results, configure `MEDALREA_RIOT_API_KEY`, `MEDALREA_PLAYER_PUUID`, and `MEDALREA_VAL_REGION` for the approved application and opted-in player. With that integration enabled, pending match recordings are retained while the app waits for results.
+For authorized post-match results, configure `THORTCLIP_RIOT_API_KEY`, `THORTCLIP_PLAYER_PUUID`, and `THORTCLIP_VAL_REGION` for the approved application and opted-in player. With that integration enabled, pending match recordings are retained while the app waits for results.
 
 ## License
 

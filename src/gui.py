@@ -1,4 +1,4 @@
-"""Modern Medal-styled control panel and clips library for MedalRea."""
+"""Tkinter control panel and clips library for ThortClip."""
 import ctypes
 from ctypes import wintypes
 import json
@@ -25,7 +25,7 @@ from .audio_manager import list_playback_devices, list_microphone_devices, test_
 from .camera_manager import list_camera_devices, capture_camera_frame, is_virtual_camera_name
 from .clip_player import read_markers, show_clip_in_folder
 from .launcher_job import contain_launcher
-from .main import MedalReaApp
+from .main import ThortClipApp
 from .thumbnail_cache import ThumbnailManager
 
 # Modern Medal.tv Dark Palette
@@ -44,7 +44,7 @@ def format_bytes(bytes_count: int) -> str:
         return f"{bytes_count / (1024 * 1024 * 1024):.2f} GB"
 
 
-class MedalToggle(tk.Canvas):
+class ThortClipToggle(tk.Canvas):
     """Custom animated-style toggle switch widget."""
     def __init__(self, parent, initial_value: bool = False, command=None, width=44, height=24, **kwargs):
         super().__init__(parent, width=width, height=height, bg=parent["bg"], highlightthickness=0, cursor="hand2", **kwargs)
@@ -85,7 +85,7 @@ class MedalToggle(tk.Canvas):
 
 
 class RecorderWindow:
-    def __init__(self, root: tk.Tk, app: MedalReaApp):
+    def __init__(self, root: tk.Tk, app: ThortClipApp):
         self.root = root
         self.app = app
         self.events = queue.SimpleQueue()
@@ -123,7 +123,7 @@ class RecorderWindow:
         root.bind("<Map>", self._schedule_repaint, add="+")
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.refresh()
-        if os.environ.get("MEDALREA_BUNDLE_TOOLS"):
+        if os.environ.get("THORTCLIP_BUNDLE_TOOLS"):
             self.root.after(2500, self.check_update)
 
     def _schedule_repaint(self, event):
@@ -796,7 +796,7 @@ class RecorderWindow:
         t_box1.pack(side="left", fill="x", expand=True)
         tk.Label(t_box1, text="Enable Video Overlays", font=("Segoe UI", 9, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
         tk.Label(t_box1, text="Turn on to include video overlays such as a webcam in your recordings.", font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w")
-        self.toggle_overlay = MedalToggle(row1, initial_value=self.app.config.overlay_enabled, command=self.on_toggle_overlay)
+        self.toggle_overlay = ThortClipToggle(row1, initial_value=self.app.config.overlay_enabled, command=self.on_toggle_overlay)
         self.toggle_overlay.pack(side="right")
 
         # 2. Enable Virtual Camera Toggle
@@ -806,7 +806,7 @@ class RecorderWindow:
         t_box2.pack(side="left", fill="x", expand=True)
         tk.Label(t_box2, text="Enable Virtual Camera", font=("Segoe UI", 9, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
         tk.Label(t_box2, text="Turn this on to choose capture from virtual camera sources like OBS Virtual Camera.", font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w")
-        self.toggle_virtual = MedalToggle(row2, initial_value=self.app.config.overlay_virtual_camera, command=self.on_toggle_virtual)
+        self.toggle_virtual = ThortClipToggle(row2, initial_value=self.app.config.overlay_virtual_camera, command=self.on_toggle_virtual)
         self.toggle_virtual.pack(side="right")
 
         # 3. Webcam Device Selection
@@ -1198,7 +1198,7 @@ class RecorderWindow:
         t_box1.pack(side="left", fill="x", expand=True)
         tk.Label(t_box1, text="Record Game Audio", font=("Georgia", 12, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
         tk.Label(t_box1, text="Capture in-game sounds, gunshots, and voice chat into your clips.", font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w")
-        self.toggle_game_audio = MedalToggle(r1, initial_value=self.app.config.game_audio_enabled, command=self.on_toggle_game_audio)
+        self.toggle_game_audio = ThortClipToggle(r1, initial_value=self.app.config.game_audio_enabled, command=self.on_toggle_game_audio)
         self.toggle_game_audio.pack(side="right")
 
         # 2. Output Device selection
@@ -1250,7 +1250,7 @@ class RecorderWindow:
         m_box1.pack(side="left", fill="x", expand=True)
         tk.Label(m_box1, text="Enable Microphone", font=("Georgia", 12, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
         tk.Label(m_box1, text="Record your voice alongside the game audio in all saved clips.", font=("Segoe UI", 8), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w")
-        self.toggle_mic = MedalToggle(m1, initial_value=self.app.config.microphone_enabled, command=self.on_toggle_mic)
+        self.toggle_mic = ThortClipToggle(m1, initial_value=self.app.config.microphone_enabled, command=self.on_toggle_mic)
         self.toggle_mic.pack(side="right")
 
         # 2. Mic device selection
@@ -1798,7 +1798,7 @@ class RecorderWindow:
 
     def check_update(self, manual=False):
         from .updates import stage_update
-        bundle = os.environ.get("MEDALREA_BUNDLE_TOOLS")
+        bundle = os.environ.get("THORTCLIP_BUNDLE_TOOLS")
         if not bundle:
             if manual:
                 import webbrowser
@@ -1820,7 +1820,7 @@ class RecorderWindow:
             try:
                 channel = Path(bundle).parent / "release.json"
                 path = stage_update(json.loads(channel.read_text(encoding="utf8")),
-                                    Path(os.environ["LOCALAPPDATA"]) / "MedalRea" / "updates")
+                                    Path(os.environ["LOCALAPPDATA"]) / "ThortClip" / "updates")
                 self.events.put(("update_checked", path, ""))
             except Exception as exc:
                 self.events.put(("update_checked", None, f"Could not check or download the update. {exc}"))
@@ -1858,7 +1858,7 @@ def main():
     root = tk.Tk()
     try:
         contain_launcher()
-        app = MedalReaApp()
+        app = ThortClipApp()
         app.start_services()
         RecorderWindow(root, app)
     except Exception as exc:

@@ -30,7 +30,7 @@ class RoundedButton(ttk.Button):
         key = (*self.palette.values(), outside)
         if key not in root._button_styles:
             p = self.palette
-            name = f"Medal{len(root._button_styles)}"
+            name = f"ThortClip{len(root._button_styles)}"
             style = ttk.Style(root)
             images = [surface(root, p["bg"], palette.CARD_BORDER, outside), surface(root, p["activebackground"], "#434239", outside),
                       surface(root, p["bg"], "#6754AA", outside), surface(root, palette.SECONDARY, "#C3BEB4", outside)]

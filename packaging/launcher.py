@@ -6,8 +6,12 @@ from pathlib import Path
 root = Path(sys.executable).parent
 tools = root / "tools"
 os.environ["PATH"] = str(tools) + os.pathsep + os.environ["PATH"]
-os.environ["MEDALREA_BUNDLE_TOOLS"] = str(tools)
-data = Path(os.environ["LOCALAPPDATA"]) / "MedalRea" / "profile"
+os.environ["THORTCLIP_BUNDLE_TOOLS"] = str(tools)
+data = Path(os.environ["LOCALAPPDATA"]) / "ThortClip" / "profile"
+legacy = data.parents[1] / "MedalRea" / "profile"
+if legacy.is_dir() and not data.exists():
+    import shutil
+    shutil.copytree(legacy, data)
 data.mkdir(parents=True, exist_ok=True)
 os.chdir(data)
 from src.config import detect_encoder

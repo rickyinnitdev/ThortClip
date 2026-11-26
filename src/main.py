@@ -18,7 +18,7 @@ import threading
 from .match_results import MatchResults
 from .launcher_job import contain_launcher
 
-class MedalReaApp:
+class ThortClipApp:
     def __init__(self, config_path: str = "config.json"):
         self.config = Config(config_path)
         self.recorder = ScreenRecorder(self.config)
@@ -313,7 +313,7 @@ class MedalReaApp:
 
 def main():
     contain_launcher()
-    app = MedalReaApp()
+    app = ThortClipApp()
     app.start()
 
 if __name__ == "__main__":

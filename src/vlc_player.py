@@ -7,8 +7,8 @@ from pathlib import Path
 class VlcPlayer:
     def __init__(self, path, hwnd):
         folder = Path(os.environ["ProgramFiles"]) / "VideoLAN/VLC"
-        if os.environ.get("MEDALREA_BUNDLE_TOOLS"):
-            folder = Path(os.environ["MEDALREA_BUNDLE_TOOLS"]) / "vlc"
+        if os.environ.get("THORTCLIP_BUNDLE_TOOLS"):
+            folder = Path(os.environ["THORTCLIP_BUNDLE_TOOLS"]) / "vlc"
         with os.add_dll_directory(str(folder)):
             dll = C.CDLL(str(folder / "libvlc.dll"))
         ptr, integer, clock = C.c_void_p, C.c_int, C.c_int64

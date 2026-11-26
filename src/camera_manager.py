@@ -6,13 +6,16 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
 def get_ffmpeg_binary() -> str:
-    if os.environ.get("MEDALREA_BUNDLE_TOOLS"):
-        return str(Path(os.environ["MEDALREA_BUNDLE_TOOLS"]) / "ffmpeg.exe")
+    if os.environ.get("THORTCLIP_BUNDLE_TOOLS"):
+        return str(Path(os.environ["THORTCLIP_BUNDLE_TOOLS"]) / "ffmpeg.exe")
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     if local_app_data:
-        local_path = Path(local_app_data) / "MedalRea" / "tools" / "ffmpeg.exe"
+        local_path = Path(local_app_data) / "ThortClip" / "tools" / "ffmpeg.exe"
         if local_path.is_file():
             return str(local_path)
+        legacy = Path(local_app_data) / "MedalRea" / "tools" / "ffmpeg.exe"
+        if legacy.is_file():
+            return str(legacy)
     return "ffmpeg"
 
 def is_virtual_camera_name(name: str) -> bool:

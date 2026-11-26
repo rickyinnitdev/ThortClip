@@ -15,7 +15,7 @@ from pathlib import Path
 import threading
 
 from src.clip_player import scan_clip_kills
-from src.main import MedalReaApp
+from src.main import ThortClipApp
 
 # Times refer to confirmed local attacker entries in the saved excerpts.
 CASES = {
@@ -39,7 +39,7 @@ def verify(source, expected, folder):
     cfg["paths"].update(temp_segment_dir=str(folder / "segments"), clips_output_dir=str(folder / "clips"))
     settings = folder / "config.json"
     settings.write_text(json.dumps(cfg))
-    app = MedalReaApp(str(settings))
+    app = ThortClipApp(str(settings))
     segments = app.config.temp_segment_dir
     manifest = segments / "times.csv"
     subprocess.run(["ffmpeg", "-v", "error", "-i", str(source.resolve()), "-map", "0:v", "-map", "0:a",

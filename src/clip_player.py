@@ -1,4 +1,4 @@
-"""MedalRea Media Player & Clip Editor with Kill Stars and Timeline Scrubbing.
+"""ThortClip Media Player & Clip Editor with Kill Stars and Timeline Scrubbing.
 Styled after Medal.tv's desktop clip player.
 """
 import hashlib
@@ -45,6 +45,7 @@ def get_ffplay_path() -> Optional[str]:
         return which
     candidates = [
         r"C:\ffmpeg\ffplay.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\ThortClip\tools\ffplay.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\MedalRea\tools\ffplay.exe"),
     ]
     for c in candidates:
@@ -59,6 +60,7 @@ def get_ffmpeg_path() -> str:
     if which:
         return which
     candidates = [
+        os.path.expandvars(r"%LOCALAPPDATA%\ThortClip\tools\ffmpeg.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\MedalRea\tools\ffmpeg.exe"),
         r"C:\ffmpeg\ffmpeg.exe",
     ]
@@ -193,7 +195,7 @@ class ClipPlayerView(tk.Frame):
         # ffplay process
         self.ffplay_proc: Optional[subprocess.Popen] = None
         self.ffplay_hwnd: Optional[int] = None
-        self.ffplay_title: str = f"MedalRea_Player_{id(self)}"
+        self.ffplay_title: str = f"ThortClip_Player_{id(self)}"
 
         # Filmstrip cache
         self.filmstrip_images: List[ImageTk.PhotoImage] = []
