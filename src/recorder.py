@@ -48,6 +48,27 @@ def get_primary_display_info():
         return dm.dmPelsWidth, dm.dmPelsHeight, max(60, dm.dmDisplayFrequency)
     return 1920, 1080, 240
 
+def gfxcapture_monitor():
+    """Record the display containing the game when its window already exists."""
+    user32 = ctypes.windll.user32
+    find_window = user32.FindWindowExW
+    find_window.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+    find_window.restype = wintypes.HWND
+    title = ctypes.create_unicode_buffer(256)
+    hwnd = None
+    while hwnd := find_window(None, hwnd, "UnrealWindow", None):
+        user32.GetWindowTextW(wintypes.HWND(hwnd), title, len(title))
+        if title.value.strip().casefold() != "valorant" or not user32.IsWindowVisible(wintypes.HWND(hwnd)):
+            continue
+        monitor_from_window = user32.MonitorFromWindow
+        monitor_from_window.argtypes = [wintypes.HWND, wintypes.DWORD]
+        monitor_from_window.restype = wintypes.HANDLE
+        monitor = monitor_from_window(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
+        if monitor:
+            return f"hmonitor={monitor}"
+    return "monitor_idx=0"
+
+
 class ScreenRecorder:
     """Manages high-performance GPU video recording into 2-second .ts rolling segments without clamping 240Hz displays."""
 
@@ -122,7 +143,7 @@ class ScreenRecorder:
             graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
             if method == "gfxcapture":
                 width, height = map(int, self.config.resolution.lower().split("x"))
-                graph = (f"gfxcapture=monitor_idx=0:width={width}:height={height}:"
+                graph = (f"gfxcapture={gfxcapture_monitor()}:width={width}:height={height}:"
                          f"resize_mode=scale:max_framerate={self.config.fps}")
             encoder, filters = self._capture_encoder(binary, graph)
         if self.config.audio_device == "system":
