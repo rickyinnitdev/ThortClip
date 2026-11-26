@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from .clip_metadata import metadata_path
 from .camera_manager import CameraPreview
 from .config import Config
-from .recorder import ScreenRecorder
+from .recorder import ScreenRecorder, valorant_monitor_handle
 from .log_watcher import LogWatcher
 from .cutter import VideoCutter
 from .kill_sources.hotkey_source import HotkeyKillSource
@@ -49,6 +49,8 @@ class ThortClipApp:
         self.camera_preview = None
         self._session_lock = threading.Lock()
         self._running = False
+        self._monitor_stop = threading.Event()
+        self._monitor_thread = None
 
     def start_services(self):
         self._running = True
@@ -69,6 +71,10 @@ class ThortClipApp:
         # 1. Start passive log watcher
         self.results.start()
         self.log_watcher.start()
+        if self.config.capture_method.lower() == "gfxcapture":
+            self._monitor_stop.clear()
+            self._monitor_thread = threading.Thread(target=self._watch_display, daemon=True)
+            self._monitor_thread.start()
 
         # 2. Start kill sources
         if self.hotkey_source:
@@ -126,12 +132,33 @@ class ThortClipApp:
                     self.results.begin(self.recorder, self.result_match)
                 self.stop_camera_preview()
                 self.recorder.start_recording()
-                if not self.result_match and self.config.detector_enabled and self.recorder.is_recording():
-                    if self.screen_detector is None:
-                        from .kill_sources.screen_detector import ScreenDetectionKillSource
-                        self.screen_detector = ScreenDetectionKillSource(self.config)
-                    self.screen_detector.monitor_handle = self.recorder.monitor_handle
-                    self.screen_detector.start(on_trigger=self._on_local_kill)
+                self._start_detector()
+
+    def _start_detector(self):
+        if not self.result_match and self.config.detector_enabled and self.recorder.is_recording():
+            if self.screen_detector is None:
+                from .kill_sources.screen_detector import ScreenDetectionKillSource
+                self.screen_detector = ScreenDetectionKillSource(self.config)
+            self.screen_detector.monitor_handle = self.recorder.monitor_handle
+            self.screen_detector.start(on_trigger=self._on_local_kill)
+
+    def _resume_capture(self, monitor=None):
+        if self.screen_detector:
+            self.screen_detector.stop()
+        self.recorder.stop_recording()
+        if monitor:
+            self._flush_round()
+        self.recorder.start_recording(resume=True, monitor=monitor)
+        self._start_detector()
+
+    def _watch_display(self):
+        while not self._monitor_stop.wait(1):
+            with self._session_lock:
+                if not self._running or not self.recorder.is_recording():
+                    continue
+                monitor = valorant_monitor_handle()
+                if monitor and monitor != self.recorder.monitor_handle:
+                    self._resume_capture(monitor)
 
     def _on_match_ended(self):
         if not self.config.idle_outside_matches and not self.result_match:
@@ -188,8 +215,7 @@ class ThortClipApp:
                 files = self.recorder.get_completed_segments()
                 latest = files[-1].stat().st_mtime if files else self.recorder.start_wall_time
                 if not self.recorder.is_recording() or time.time() - latest > 15:
-                    self.recorder.stop_recording()
-                    self.recorder.start_recording(resume=True)
+                    self._resume_capture()
 
     def _on_clip_triggered(self, trigger_wall_time: float, kill_count: Optional[int], meta: Dict[str, Any]):
         if not self.recorder.is_recording() and meta.get("source") != "personal_round":
@@ -302,6 +328,9 @@ class ThortClipApp:
     def stop(self):
         print("\n[App] Shutting down...")
         self._running = False
+        self._monitor_stop.set()
+        if self._monitor_thread:
+            self._monitor_thread.join()
         if self.hotkey_source:
             self.hotkey_source.stop()
         if self.screen_detector:

@@ -60,6 +60,8 @@ def valorant_monitor_handle():
         user32.GetWindowTextW(wintypes.HWND(hwnd), title, len(title))
         if title.value.strip().casefold() != "valorant" or not user32.IsWindowVisible(wintypes.HWND(hwnd)):
             continue
+        if user32.IsIconic(wintypes.HWND(hwnd)):
+            continue
         monitor_from_window = user32.MonitorFromWindow
         monitor_from_window.argtypes = [wintypes.HWND, wintypes.DWORD]
         monitor_from_window.restype = wintypes.HANDLE
@@ -111,7 +113,7 @@ class ScreenRecorder:
                 continue
         return "libx264", download
 
-    def start_recording(self, *, resume=False):
+    def start_recording(self, *, resume=False, monitor=None):
         """Starts recording into 2-second .ts segments with GPU acceleration."""
         if self.is_recording():
             print("[Recorder] Recording is already active.")
@@ -144,7 +146,7 @@ class ScreenRecorder:
             graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
             if method == "gfxcapture":
                 width, height = map(int, self.config.resolution.lower().split("x"))
-                self.monitor_handle = valorant_monitor_handle()
+                self.monitor_handle = monitor or valorant_monitor_handle()
                 selector = f"hmonitor={self.monitor_handle}" if self.monitor_handle else "monitor_idx=0"
                 graph = (f"gfxcapture={selector}:width={width}:height={height}:"
                          f"resize_mode=scale:max_framerate={self.config.fps}")
