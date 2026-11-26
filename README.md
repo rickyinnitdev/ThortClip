@@ -13,7 +13,7 @@
   <a href="#record-your-first-clip">Quick start</a> ·
   <a href="#browse-your-highlights">Clips Library</a> ·
   <a href="#customize-your-recordings">Recording settings</a> ·
-  <a href="#support-thortclip">Support ThortClip</a>
+  <a href="https://rickydev.vercel.app/support">Donate</a>
 </p>
 
 ## Record your first clip
@@ -58,6 +58,8 @@ The installed profile lives at `%LOCALAPPDATA%\ThortClip\profile\config.json`. O
 For authorized post-match results, configure `THORTCLIP_RIOT_API_KEY`, `THORTCLIP_PLAYER_PUUID`, and `THORTCLIP_VAL_REGION` for the approved application and opted-in player. With that integration enabled, pending match recordings are retained while the app waits for results.
 
 ## Support ThortClip
+
+If ThortClip helped you save a favorite round, you can leave an optional tip. [Donate through my portfolio](https://rickydev.vercel.app/support)
 
 Found a recording or playback issue? Include your capture settings and what happened so I can reproduce it. [Report an issue](https://github.com/rickyinnitdev/ThortClip/issues/new)
 
