@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from .clip_metadata import metadata_path
 from .camera_manager import CameraPreview
 from .config import Config
-from .recorder import ScreenRecorder, valorant_monitor_handle
+from .recorder import ScreenRecorder, valorant_window
 from .log_watcher import LogWatcher
 from .cutter import VideoCutter
 from .kill_sources.hotkey_source import HotkeyKillSource
@@ -47,7 +47,8 @@ class ThortClipApp:
         )
 
         self.camera_preview = None
-        self._session_lock = threading.Lock()
+        self._session_lock = threading.RLock()
+        self._waiting_for_window = False
         self._running = False
         self._monitor_stop = threading.Event()
         self._monitor_thread = None
@@ -111,7 +112,7 @@ class ThortClipApp:
         if preview:
             preview.stop()
 
-    def _on_match_detected(self):
+    def _on_match_detected(self, target=None):
         with self._session_lock:
             if (self.results.enabled and self.log_watcher.match_id
                     and self.result_match != self.log_watcher.match_id and self.recorder.is_recording()):
@@ -121,6 +122,11 @@ class ThortClipApp:
                 self._flush_round()
                 self._queue_results()
             if self._running and not self.recorder.is_recording():
+                if self.log_watcher.in_match and self.config.capture_method.lower() == "gfxcapture":
+                    target = target or valorant_window()
+                    self._waiting_for_window = target is None
+                    if self._waiting_for_window:
+                        return
                 with self._kill_lock:
                     self._kill_times.clear()
                     self._round_kills.clear()
@@ -131,7 +137,7 @@ class ThortClipApp:
                 if self.result_match:
                     self.results.begin(self.recorder, self.result_match)
                 self.stop_camera_preview()
-                self.recorder.start_recording()
+                self.recorder.start_recording(target=target)
                 self._start_detector()
 
     def _start_detector(self):
@@ -142,25 +148,35 @@ class ThortClipApp:
             self.screen_detector.monitor_handle = self.recorder.monitor_handle
             self.screen_detector.start(on_trigger=self._on_local_kill)
 
-    def _resume_capture(self, monitor=None):
+    def _resume_capture(self, target=None):
         if self.screen_detector:
             self.screen_detector.stop()
         self.recorder.stop_recording()
-        if monitor:
+        if target:
             self._flush_round()
-        self.recorder.start_recording(resume=True, monitor=monitor)
+        self.recorder.start_recording(resume=True, target=target)
         self._start_detector()
 
     def _watch_display(self):
         while not self._monitor_stop.wait(1):
             with self._session_lock:
-                if not self._running or not self.recorder.is_recording():
+                if not self._running:
                     continue
-                monitor = valorant_monitor_handle()
-                if monitor and monitor != self.recorder.monitor_handle:
-                    self._resume_capture(monitor)
+                if self._waiting_for_window and self.log_watcher.in_match:
+                    target = valorant_window()
+                    if target:
+                        self._on_match_detected(target)
+                elif self.recorder.is_recording():
+                    target = valorant_window()
+                    if target and target != (self.recorder.window_handle, self.recorder.monitor_handle):
+                        self._resume_capture(target)
+                elif self.recorder.window_handle and self.recorder.process is not None and self.log_watcher.in_match:
+                    target = valorant_window()
+                    if target:
+                        self._resume_capture(target)
 
     def _on_match_ended(self):
+        self._waiting_for_window = False
         if not self.config.idle_outside_matches and not self.result_match:
             self._flush_round()
         if self.config.idle_outside_matches or self.result_match:
@@ -215,7 +231,9 @@ class ThortClipApp:
                 files = self.recorder.get_completed_segments()
                 latest = files[-1].stat().st_mtime if files else self.recorder.start_wall_time
                 if not self.recorder.is_recording() or time.time() - latest > 15:
-                    self._resume_capture()
+                    target = valorant_window() if self.recorder.window_handle else None
+                    if target or not self.recorder.window_handle:
+                        self._resume_capture(target)
 
     def _on_clip_triggered(self, trigger_wall_time: float, kill_count: Optional[int], meta: Dict[str, Any]):
         if not self.recorder.is_recording() and meta.get("source") != "personal_round":
@@ -316,6 +334,7 @@ class ThortClipApp:
 
     def manual_stop_recording(self):
         with self._session_lock:
+            self._waiting_for_window = False
             if self.screen_detector:
                 self.screen_detector.stop()
             self.recorder.stop_recording()

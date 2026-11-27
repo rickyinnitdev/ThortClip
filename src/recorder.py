@@ -48,26 +48,51 @@ def get_primary_display_info():
         return dm.dmPelsWidth, dm.dmPelsHeight, max(60, dm.dmDisplayFrequency)
     return 1920, 1080, 240
 
-def valorant_monitor_handle():
-    """Record the display containing the game when its window already exists."""
-    user32 = ctypes.windll.user32
-    find_window = user32.FindWindowExW
-    find_window.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
-    find_window.restype = wintypes.HWND
-    title = ctypes.create_unicode_buffer(256)
-    hwnd = None
-    while hwnd := find_window(None, hwnd, "UnrealWindow", None):
-        user32.GetWindowTextW(wintypes.HWND(hwnd), title, len(title))
-        if title.value.strip().casefold() != "valorant" or not user32.IsWindowVisible(wintypes.HWND(hwnd)):
-            continue
-        if user32.IsIconic(wintypes.HWND(hwnd)):
-            continue
-        monitor_from_window = user32.MonitorFromWindow
-        monitor_from_window.argtypes = [wintypes.HWND, wintypes.DWORD]
-        monitor_from_window.restype = wintypes.HANDLE
-        monitor = monitor_from_window(hwnd, 2)  # MONITOR_DEFAULTTONEAREST
-        if monitor:
-            return monitor
+def valorant_window():
+    """Resolve the visible gameplay HWND independently of Windows display numbering."""
+    user = ctypes.windll.user32
+    kernel = ctypes.windll.kernel32
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    user.MonitorFromWindow.restype = wintypes.HANDLE
+    result = []
+    callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    @callback
+    def visit(handle, _):
+        hwnd = wintypes.HWND(handle)
+        if not user.IsWindowVisible(hwnd) or user.IsIconic(hwnd):
+            return True
+        rect = wintypes.RECT()
+        if not user.GetClientRect(hwnd, ctypes.byref(rect)) or rect.right < 320 or rect.bottom < 200:
+            return True
+        pid = wintypes.DWORD()
+        user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        process = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        name = ""
+        if process:
+            path = ctypes.create_unicode_buffer(32768)
+            length = wintypes.DWORD(len(path))
+            try:
+                if kernel.QueryFullProcessImageNameW(wintypes.HANDLE(process), 0, path, ctypes.byref(length)):
+                    name = Path(path.value).name.casefold()
+            finally:
+                kernel.CloseHandle(wintypes.HANDLE(process))
+        if name != "valorant-win64-shipping.exe":
+            if name:
+                return True
+            # Protected processes can deny image queries. Match both window properties.
+            title, klass = ctypes.create_unicode_buffer(256), ctypes.create_unicode_buffer(256)
+            user.GetWindowTextW(hwnd, title, len(title))
+            user.GetClassNameW(hwnd, klass, len(klass))
+            if title.value.strip().casefold() != "valorant" or klass.value != "UnrealWindow":
+                return True
+        result.append((rect.right * rect.bottom, handle, user.MonitorFromWindow(hwnd, 2)))
+        return True
+
+    user.EnumWindows(visit, 0)
+    if result:
+        _, hwnd, monitor = max(result)
+        return hwnd, monitor
     return None
 
 
@@ -77,6 +102,7 @@ class ScreenRecorder:
     def __init__(self, config: Config):
         self.config = config
         self.monitor_handle = None
+        self.window_handle = None
         self.keep_from = None
         self.retain_match = False
         self.playback = None
@@ -113,7 +139,7 @@ class ScreenRecorder:
                 continue
         return "libx264", download
 
-    def start_recording(self, *, resume=False, monitor=None):
+    def start_recording(self, *, resume=False, target=None):
         """Starts recording into 2-second .ts segments with GPU acceleration."""
         if self.is_recording():
             print("[Recorder] Recording is already active.")
@@ -146,8 +172,9 @@ class ScreenRecorder:
             graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
             if method == "gfxcapture":
                 width, height = map(int, self.config.resolution.lower().split("x"))
-                self.monitor_handle = monitor or valorant_monitor_handle()
-                selector = f"hmonitor={self.monitor_handle}" if self.monitor_handle else "monitor_idx=0"
+                target = target or valorant_window()
+                self.window_handle, self.monitor_handle = target or (None, None)
+                selector = f"hwnd={self.window_handle}" if self.window_handle else "monitor_idx=0"
                 graph = (f"gfxcapture={selector}:width={width}:height={height}:"
                          f"resize_mode=scale:max_framerate={self.config.fps}")
             encoder, filters = self._capture_encoder(binary, graph)
