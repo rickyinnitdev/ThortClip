@@ -115,6 +115,7 @@ class RecorderWindow:
 
         self.checking_update = False
         self.manual_update = False
+        self.startup_update = False
         self.pending_update = None
         self.build_interface("library")
         self.repaint_pending = None
@@ -124,7 +125,7 @@ class RecorderWindow:
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.refresh()
         if os.environ.get("THORTCLIP_BUNDLE_TOOLS"):
-            self.root.after(2500, self.check_update)
+            self.root.after(2500, lambda: self.check_update(startup=True))
 
     def _schedule_repaint(self, event):
         if event.widget is not self.root:
@@ -1668,11 +1669,12 @@ class RecorderWindow:
                     elif not item[1]:
                         messagebox.showinfo("Check for update", "You’re up to date.", parent=self.root)
                 self.manual_update = False
+                startup, self.startup_update = self.startup_update, False
                 if item[1]:
-                    self.events.put(("update_ready", item[1]))
-            elif event_type == "update_ready":
-                self.pending_update = item[1]
-                self.check_button.configure(text="Restart to update", state="normal")
+                    self.pending_update = item[1]
+                    self.check_button.configure(text="Restart to update", state="normal")
+                    if startup and self.apply_startup_update():
+                        return
             elif event_type == "action_done":
                 self.notice = item[1]
                 self.busy = False
@@ -1796,7 +1798,7 @@ class RecorderWindow:
         delay = 1000 if self.root.state() == "normal" else 5000
         self.root.after(delay, self.refresh)
 
-    def check_update(self, manual=False):
+    def check_update(self, manual=False, *, startup=False):
         from .updates import stage_update
         bundle = os.environ.get("THORTCLIP_BUNDLE_TOOLS")
         if not bundle:
@@ -1810,6 +1812,7 @@ class RecorderWindow:
             if manual:
                 messagebox.showinfo("Check for update", "Update ready. Use Restart to update between matches.", parent=self.root)
             return
+        self.startup_update |= startup
         self.manual_update |= manual
         if self.checking_update:
             return
@@ -1827,6 +1830,22 @@ class RecorderWindow:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def apply_startup_update(self):
+        if self.busy or self.active_view != "library" or not self.app._session_lock.acquire(blocking=False):
+            return False
+        try:
+            if (self.app.recorder.is_recording() or self.app.log_watcher.in_match
+                    or str(self.clip_player.btn_save_edits.cget("state")) == "disabled"
+                    or (self.app.results.enabled and any(self.app.results.root.glob("*/ready.json")))):
+                return False
+            if not self.launch_update():
+                return False
+            self.app._running = False
+        finally:
+            self.app._session_lock.release()
+        self.close()
+        return True
+
     def restart_for_update(self):
         if self.busy or str(self.clip_player.btn_save_edits.cget("state")) == "disabled":
             messagebox.showinfo("Restart to update", "An action is in progress. Try again when it finishes.", parent=self.root)
@@ -1835,13 +1854,17 @@ class RecorderWindow:
             if not messagebox.askyesno("Restart to update",
                     "Stop recording and restart ThortClip now? Capture will pause during the update.", parent=self.root):
                 return
+        if self.launch_update():
+            self.close()
+
+    def launch_update(self):
         try:
             subprocess.Popen([str(self.pending_update), "/update", str(os.getpid())],
                              creationflags=subprocess.CREATE_BREAKAWAY_FROM_JOB)
         except OSError as exc:
             messagebox.showerror("Update", str(exc), parent=self.root)
-            return
-        self.close()
+            return False
+        return True
 
     def close(self):
         self.stop_live_preview()

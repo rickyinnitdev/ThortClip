@@ -47,7 +47,7 @@ On first launch, the installer-created profile uses the primary display resoluti
 
 The recorder keeps a rolling buffer of short segments. Standard highlights use stream copy; adding a webcam overlay requires video re-encoding. The detector looks for the local attacker and checks the spectator HUD to avoid crediting a teammate’s kill.
 
-Click **Check for update** below Settings in the sidebar to check immediately. The installed app also checks GitHub Releases on launch and every four hours. When a newer installer has downloaded and passed its checksum check, the sidebar button changes to **Restart to update**. If capture is running, ThortClip asks before stopping it. Let an active clip export finish before restarting. Source checkouts launched with `run.bat` use Git for updates.
+On launch, the installed app checks for a new release in the background. If one is available and the app is idle in the Clips Library, it verifies the installer, installs it, and reopens automatically. During a match, recording, or edit, the update stays ready under **Restart to update**. The app also checks every four hours, or you can click **Check for update** in the sidebar. Source checkouts use Git for updates.
 
 ## Development
 
