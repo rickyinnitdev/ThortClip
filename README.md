@@ -24,6 +24,8 @@ ThortClip reads the kill feed locally and saves one highlight from your first de
 2. Leave the app open and enter a match. **Capture Status** shows when recording is active. You can also choose **Start recording** to try it before a match.
 3. Press **F8** during recording, or finish a round with a personal kill. Open **Clips Library** to play the highlight. Click a kill marker to jump to that moment, or choose **Open clip in folder** to select the MP4 in Explorer.
 
+A manual save captures the play around your keypress. You can use it even in a zero-kill round. If the same round also qualifies for an automatic highlight, both clips appear in the library with separate labels. Hold the hotkey for one save, or release and press it again for another.
+
 On a fresh install, clips are saved under **Videos → ThortClip**. Check **Settings → Clips Output Directory** for the actual location, especially after upgrading from an earlier version.
 
 ## Browse your highlights

@@ -13,7 +13,7 @@ VK_MAP = {
     "F8": 0x77,
 }
 
-MOD_NONE = 0x0000
+MOD_NOREPEAT = 0x4000
 WM_HOTKEY = 0x0312
 HOTKEY_ID = 101
 
@@ -42,7 +42,7 @@ class HotkeyKillSource(KillSourceBase):
 
     def _msg_loop(self):
         thread_id = threading.get_ident()
-        if not user32.RegisterHotKey(None, HOTKEY_ID, MOD_NONE, self.vk_code):
+        if not user32.RegisterHotKey(None, HOTKEY_ID, MOD_NOREPEAT, self.vk_code):
             print(f"[HotkeySource] Warning: Failed to register hotkey {self.key_name} (may be in use).")
             return
 

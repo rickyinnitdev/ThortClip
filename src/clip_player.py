@@ -1037,6 +1037,7 @@ class ClipPlayerView(tk.Frame):
                 ]
                 sidecar = {
                     "clip_name": out_name,
+                    "save_type": "edit",
                     "duration": round(diff, 2),
                     "kill_count": len(adj_kills),
                     "kills": adj_kills,

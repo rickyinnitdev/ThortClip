@@ -237,8 +237,6 @@ class ThortClipApp:
 
     def _on_clip_triggered(self, trigger_wall_time: float, kill_count: Optional[int], meta: Dict[str, Any]):
         if not self.recorder.is_recording() and meta.get("source") != "personal_round":
-            if meta.get("source") == "hotkey":
-                self._on_match_detected()
             return
 
         source = meta.get("source", "unknown")
@@ -318,6 +316,7 @@ class ThortClipApp:
                 import json
                 sidecar_data = {
                     "clip_name": saved_path.name,
+                    "save_type": "auto" if source == "personal_round" else "manual",
                     "duration": round(max(1.0, end - start), 2),
                     "kill_count": len(relative_kills) if relative_kills else kill_count,
                     "kills": relative_kills,

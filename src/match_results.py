@@ -101,6 +101,7 @@ class MatchResults:
                     rel_kills = [round(max(0.0, stamp - clip_start), 2) for stamp, _ in kills]
                     sidecar = {
                         "clip_name": name,
+                        "save_type": "auto",
                         "round": rnd,
                         "kill_count": len(kills),
                         "kills": rel_kills,

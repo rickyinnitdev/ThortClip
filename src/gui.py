@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 import json
+from .clip_metadata import metadata_path
 import math
 import os
 import queue
@@ -325,7 +326,7 @@ class RecorderWindow:
         self.top_btn_start.pack(side="left")
 
         self.top_btn_save = RoundedButton(
-            actions_box, text="🎬 Save clip", font=("Segoe UI", 9, "bold"),
+            actions_box, text="Save manual clip", font=("Segoe UI", 9, "bold"),
             fg=palette.TEXT, bg=palette.ACCENT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
             relief="flat", borderwidth=0, padx=12, pady=5, cursor="hand2", command=self.save_clip
         )
@@ -502,11 +503,25 @@ class RecorderWindow:
         key = str(clip_path.resolve())
         mtime = clip_path.stat().st_mtime
         marks = read_markers(clip_path)
-        if key in self._clip_meta_cache and self._clip_meta_cache[key].get("mtime") == mtime:
+        sidecar = metadata_path(clip_path)
+        try:
+            sidecar_time = sidecar.stat().st_mtime_ns
+        except OSError:
+            sidecar_time = None
+        cached = self._clip_meta_cache.get(key)
+        if cached and cached["mtime"] == mtime and cached["sidecar_time"] == sidecar_time:
             if marks is not None:
                 self._clip_meta_cache[key]["kills"] = len(marks)
             return self._clip_meta_cache[key]
 
+        save_type = None
+        if sidecar_time is not None:
+            try:
+                data = json.loads(sidecar.read_text(encoding="utf8"))
+                if isinstance(data, dict):
+                    save_type = data.get("save_type")
+            except (OSError, ValueError):
+                pass
         name = clip_path.stem
         kills = 0
         m = re.match(r"^(\d+)K", name, re.IGNORECASE)
@@ -526,6 +541,8 @@ class RecorderWindow:
 
         meta = {
             "path": clip_path,
+            "save_type": save_type,
+            "sidecar_time": sidecar_time,
             "name": name,
             "kills": len(marks) if marks is not None else kills,
             "round": round_num,
@@ -655,6 +672,7 @@ class RecorderWindow:
         info.pack(fill="x", padx=5, pady=(0, 6))
 
         title_text = f"{kills}K Highlight" if kills > 0 else "Match Clip"
+        title_text = {"manual": "Manual clip", "auto": "Auto highlight", "edit": "Edited clip"}.get(meta["save_type"], title_text)
         if meta["round"]:
             title_text += f" (Round {meta['round']})"
 
@@ -1465,7 +1483,7 @@ class RecorderWindow:
         self.dash_btn_start.pack(side="left", padx=(0, 10))
 
         self.dash_btn_save = RoundedButton(
-            actions_row, text="🎬 Save clip (F8)", font=("Segoe UI", 10, "bold"),
+            actions_row, text="Save manual clip", font=("Segoe UI", 10, "bold"),
             fg=palette.TEXT, bg=palette.ACCENT, activebackground=palette.ACCENT_HOVER, activeforeground=palette.TEXT,
             relief="flat", borderwidth=0, padx=18, pady=10, cursor="hand2", command=self.save_clip
         )
@@ -1531,7 +1549,7 @@ class RecorderWindow:
 
         # Hotkey Info
         tk.Label(card, text="Manual Save Hotkey", font=("Georgia", 12, "bold"), fg=palette.TEXT, bg=palette.CARD_BG).pack(anchor="w")
-        tk.Label(card, text=f"[{self.app.config.hotkey_key}] - Press in-game to save the recent highlight immediately", font=("Segoe UI", 9), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w", pady=(2, 0))
+        tk.Label(card, text=f"[{self.app.config.hotkey_key}] - Save a manual clip while recording. Automatic highlights save separately at round end.", font=("Segoe UI", 9), fg=palette.MUTED, bg=palette.CARD_BG).pack(anchor="w", pady=(2, 0))
 
     def toggle_dark_mode(self):
         dark = bool(self.dark_toggle.get())
