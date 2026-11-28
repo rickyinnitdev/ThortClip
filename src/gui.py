@@ -1753,7 +1753,7 @@ class RecorderWindow:
 
         recording = self.app.recorder.is_recording()
         playback = self.app.recorder.playback
-        mic_warning = playback.mic_warning if playback and recording else ""
+        mic_warning = " ".join(filter(None, (playback.playback_warning, playback.mic_warning))) if playback and recording else ""
         in_match = self.app.log_watcher.in_match
         log_status = self.app.log_watcher.log_status
         state = recording, in_match, log_status, self.notice, self.app.results.status, mic_warning
@@ -1762,7 +1762,7 @@ class RecorderWindow:
             # Update Topbar Status Pill and Action Buttons
             if recording:
                 self.status_canvas.itemconfigure(self.status_dot, fill=palette.ACCENT)
-                self.status_text.configure(text="Recording: VALORANT", fg=palette.LINK)
+                self.status_text.configure(text="Recording", fg=palette.LINK)
                 if hasattr(self, "top_btn_start"):
                     self.top_btn_start.pack_forget()
                 if hasattr(self, "top_btn_save"):
@@ -1786,7 +1786,7 @@ class RecorderWindow:
                     text="Recording" if recording else "Standby",
                     fg=palette.LINK if recording else palette.TEXT
                 )
-                detail_msg = self.notice or (f"{log_status} — {self.app.log_watcher.log_path}" if log_status else "") or mic_warning or self.app.results.status or (
+                detail_msg = mic_warning or (self.app.recorder.capture_status if recording else "") or self.notice or (f"{log_status} — {self.app.log_watcher.log_path}" if log_status else "") or self.app.results.status or (
                     "Your replay buffer is active. Kill highlights are auto-saved." if recording else "Waiting for match activity or click Start recording."
                 )
                 self.dash_detail.configure(text=detail_msg)

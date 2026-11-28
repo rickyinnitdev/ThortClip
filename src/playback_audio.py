@@ -31,11 +31,10 @@ class AudioTimeline:
         self.packets.append((position, data))
         return None, pa.paContinue
 
-    def read(self, cursor, end):
+    def read(self, cursor, end, *, retain_from=None):
         frame_bytes = self.channels * 2
         block = bytearray((end - cursor) * frame_bytes)
-        while self.packets:
-            start, data = self.packets[0]
+        for start, data in list(self.packets):
             if start >= end:
                 break
             stop = start + len(data) // frame_bytes
@@ -43,6 +42,11 @@ class AudioTimeline:
             if hi > lo:
                 block[(lo-cursor)*frame_bytes:(hi-cursor)*frame_bytes] = data[(lo-start)*frame_bytes:(hi-start)*frame_bytes]
             if stop > end:
+                break
+        cutoff = end if retain_from is None else retain_from
+        while self.packets:
+            start, data = self.packets[0]
+            if start + len(data) // frame_bytes > cutoff:
                 break
             self.packets.popleft()
         return block
@@ -60,7 +64,9 @@ class PlaybackAudio:
                  **kwargs):
         self.host = pa.PyAudio()
         self.mic_stream = None
+        self.stream = None
         self.mic_warning = ""
+        self.playback_warning = ""
         self.done = threading.Event()
         self.thread = None
         self.playback_volume = max(0.0, float(playback_volume))
@@ -87,9 +93,17 @@ class PlaybackAudio:
                                          frames_per_buffer=self.chunk, start=False,
                                          stream_callback=self.game.capture)
             self.game.input_latency = self.stream.get_input_latency()
-        except Exception:
-            self.host.terminate()
-            raise
+        except (OSError, ValueError, LookupError) as exc:
+            if self.stream:
+                self.stream.close()
+                self.stream = None
+            if not microphone:
+                self.host.terminate()
+                raise
+            self.playback_warning = f"System playback unavailable. ({exc})"
+            self.rate, self.channels = 48000, 2
+            self.chunk = self.rate // 100
+            self.game = AudioTimeline(self.rate, self.channels)
 
         if microphone:
             try:
@@ -106,14 +120,21 @@ class PlaybackAudio:
                 if mic_dev is None:
                     mic_dev = self.host.get_default_wasapi_device(d_in=True)
 
-                self.mic = AudioTimeline(self.rate, min(2, mic_dev["maxInputChannels"]))
+                mic_rate = int(mic_dev["defaultSampleRate"])
+                self.mic = AudioTimeline(mic_rate, min(2, mic_dev["maxInputChannels"]))
                 self.mic_stream = self.host.open(
-                    format=pa.paInt16, channels=self.mic.channels, rate=self.rate,
-                    input=True, input_device_index=mic_dev["index"], frames_per_buffer=self.chunk,
+                    format=pa.paInt16, channels=self.mic.channels, rate=mic_rate,
+                    input=True, input_device_index=mic_dev["index"], frames_per_buffer=mic_rate // 100,
                     start=False, stream_callback=self.mic.capture)
                 self.mic.input_latency = self.mic_stream.get_input_latency()
             except (OSError, ValueError, LookupError) as exc:
-                self.mic_warning = f"Microphone unavailable. Recording game audio only. ({exc})"
+                if self.mic_stream:
+                    self.mic_stream.close()
+                    self.mic_stream = None
+                self.mic_warning = f"Microphone unavailable. ({exc})"
+        if not self.stream and not self.mic_stream:
+            self.host.terminate()
+            raise OSError(self.playback_warning + " " + self.mic_warning)
 
     def start(self, pipe, origin):
         self.origin = self.game.origin = origin
@@ -125,7 +146,17 @@ class PlaybackAudio:
                 self.mic_warning = f"Microphone unavailable. Recording game audio only. ({exc})"
                 self.mic_stream.close()
                 self.mic_stream = None
-        self.stream.start_stream()
+        if self.stream:
+            try:
+                self.stream.start_stream()
+            except OSError as exc:
+                if not self.mic_stream:
+                    raise
+                self.stream.close()
+                self.stream = None
+                self.playback_warning = f"System playback unavailable. ({exc})"
+        if not self.stream and not self.mic_stream:
+            raise OSError("Neither audio input could start.")
         self.thread = threading.Thread(target=self.feed, args=(pipe,), daemon=True)
         self.thread.start()
 
@@ -150,8 +181,14 @@ class PlaybackAudio:
                         game = game * self.playback_volume
 
                 if self.mic_stream:
-                    mic = np.frombuffer(self.mic.read(cursor, end), dtype="<i2")
+                    positions = np.arange(cursor, end, dtype=np.float64) * self.mic.rate / self.rate
+                    mic_start = int(positions[0])
+                    mic_end = math.ceil(positions[-1]) + 1
+                    mic = np.frombuffer(self.mic.read(mic_start, mic_end,
+                        retain_from=int(end * self.mic.rate / self.rate)), dtype="<i2")
                     voice = mic.reshape(-1, self.mic.channels).mean(axis=1).astype(np.float32)
+                    if self.mic.rate != self.rate:
+                        voice = np.interp(positions - mic_start, np.arange(len(voice)), voice)
                     if self.microphone_volume != 1.0:
                         voice = voice * self.microphone_volume
                     mixed = game + voice[:, None]
@@ -176,5 +213,6 @@ class PlaybackAudio:
             self.thread.join()
         if self.mic_stream:
             self.mic_stream.close()
-        self.stream.close()
+        if self.stream:
+            self.stream.close()
         self.host.terminate()

@@ -1,6 +1,6 @@
 import os
 import time
-import shutil
+import tempfile
 import threading
 import subprocess
 import ctypes
@@ -106,6 +106,8 @@ class ScreenRecorder:
         self.keep_from = None
         self.retain_match = False
         self.playback = None
+        self.capture_status = ""
+        self._video_profile = None
         self.webcam: Optional[WebcamRecorder] = None
         self.process: Optional[subprocess.Popen] = None
         self.segment_dir: Path = self.config.temp_segment_dir
@@ -116,28 +118,42 @@ class ScreenRecorder:
         self._prune_stop = threading.Event()
         self._prune_thread: Optional[threading.Thread] = None
 
-    def _capture_encoder(self, binary, graph):
+    def _capture_encoder(self, binary, graph, fps, height):
         preferred = self.config.encoder
         download = "hwdownload,format=bgra,format=nv12"
-        if preferred not in ("h264_nvenc", "hevc_nvenc"):
-            return preferred, download
-
-        # Hybrid laptops may capture on the integrated GPU. Test the actual
-        # display frames first, then transfer them before trying other encoders.
-        for encoder, filters in ((preferred, ""), (preferred, download),
-                                 ("h264_qsv", download), ("h264_amf", download)):
-            probe = [binary, "-v", "error", "-f", "lavfi", "-i", graph]
-            if filters:
-                probe += ["-vf", filters]
-            probe += ["-frames:v", "1", "-c:v", encoder, "-b:v", self.config.bitrate, "-f", "null", "-"]
-            try:
-                result = subprocess.run(probe, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                        stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, timeout=4)
-                if result.returncode == 0:
-                    return encoder, filters
-            except subprocess.TimeoutExpired:
-                continue
-        return "libx264", download
+        candidates = []
+        if preferred in ("h264_nvenc", "hevc_nvenc"):
+            candidates.append((preferred, "", fps))
+        candidates.extend((encoder, download, fps) for encoder in
+                          dict.fromkeys((preferred, "h264_nvenc", "h264_qsv", "h264_amf"))
+                          if encoder != "libx264")
+        scale = f"scale=-2:{min(720, height)},format=yuv420p"
+        software = ("libx264", f"{download},{scale}", min(30, fps))
+        if preferred == "libx264":
+            candidates.insert(0, software)
+        else:
+            candidates.append(software)
+        with tempfile.TemporaryDirectory(prefix="thortclip-probe-") as folder:
+            sample = str(Path(folder) / "sample.ts")
+            for encoder, filters, rate in candidates:
+                probe = [binary, "-y", "-v", "error", "-f", "lavfi", "-i", graph]
+                if filters:
+                    probe += ["-vf", filters]
+                probe += ["-r", str(rate), "-frames:v", "6", "-c:v", encoder]
+                if encoder == "libx264":
+                    probe += ["-preset", "ultrafast"]
+                probe += ["-b:v", self.config.bitrate, "-f", "mpegts", sample]
+                try:
+                    options = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, timeout=4)
+                    if subprocess.run(probe, **options).returncode == 0 and subprocess.run(
+                        [binary, "-v", "error", "-xerror", "-f", "mpegts", "-i", sample, "-frames:v", "1",
+                         "-f", "null", "-"], **options
+                    ).returncode == 0:
+                        return encoder, filters, rate
+                except subprocess.TimeoutExpired:
+                    continue
+        raise RuntimeError("Screen capture failed. Try another graphics driver or explicitly select desktop capture.")
 
     def start_recording(self, *, resume=False, target=None):
         """Starts recording into 2-second .ts segments with GPU acceleration."""
@@ -146,11 +162,9 @@ class ScreenRecorder:
             return
 
         self._stop_camera_session()
-        if self.segment_dir.exists() and not self.retain_match and not resume:
-            shutil.rmtree(self.segment_dir, ignore_errors=True)
         self.segment_dir.mkdir(parents=True, exist_ok=True)
 
-        existing = sorted(self.segment_dir.glob("seg_*.ts")) if resume else []
+        existing = sorted(self.segment_dir.glob("seg_*.ts"))
         self.first_segment = int(existing[-1].stem.split("_")[-1]) + 1 if existing else 0
         self.start_wall_time = time.time()
         segment_pattern = str(self.segment_dir / "seg_%06d.ts")
@@ -160,14 +174,13 @@ class ScreenRecorder:
         print(f"[Recorder] Detected primary display: {native_w}x{native_h} @ {native_hz}Hz")
 
         method = self.config.capture_method.lower()
-        binary = "ffmpeg"
-        if method == "gfxcapture":
-            from .camera_manager import get_ffmpeg_binary
-            binary = get_ffmpeg_binary()
+        from .camera_manager import get_ffmpeg_binary
+        binary = get_ffmpeg_binary()
         cmd = [binary, "-hide_banner", "-loglevel", "error", "-nostats", "-y"]
 
         gpu_capture = method in ("auto", "ddagrab", "gfxcapture")
         encoder, filters = self.config.encoder, ""
+        fps = self.config.fps
         if gpu_capture:
             graph = f"ddagrab=output_idx=0:framerate={self.config.fps}:draw_mouse=1"
             if method == "gfxcapture":
@@ -177,17 +190,30 @@ class ScreenRecorder:
                 selector = f"hwnd={self.window_handle}" if self.window_handle else "monitor_idx=0"
                 graph = (f"gfxcapture={selector}:width={width}:height={height}:"
                          f"resize_mode=scale:max_framerate={self.config.fps}")
-            encoder, filters = self._capture_encoder(binary, graph)
-        if self.config.audio_device == "system":
+            if resume and self._video_profile:
+                encoder, filters, fps = self._video_profile
+            else:
+                encoder, filters, fps = self._capture_encoder(
+                    binary, graph, fps, height if method == "gfxcapture" else native_h)
+        self.start_wall_time = time.time()
+        self.capture_status = f"{method} · {encoder} · {fps} FPS"
+        audio_device = self.config.audio_device
+        if audio_device == "system":
             from .playback_audio import PlaybackAudio
-            self.playback = PlaybackAudio(
-                microphone=self.config.microphone_enabled,
-                playback_device=self.config.playback_device,
-                microphone_device=self.config.microphone_device,
-                playback_volume=self.config.playback_volume,
-                microphone_volume=self.config.microphone_volume,
-                game_audio_enabled=self.config.game_audio_enabled,
-            )
+            try:
+                self.playback = PlaybackAudio(
+                    microphone=self.config.microphone_enabled,
+                    playback_device=self.config.playback_device,
+                    microphone_device=self.config.microphone_device,
+                    playback_volume=self.config.playback_volume,
+                    microphone_volume=self.config.microphone_volume,
+                    game_audio_enabled=self.config.game_audio_enabled,
+                )
+            except (OSError, ValueError, LookupError) as exc:
+                audio_device = "none"
+                self.capture_status += " · Audio unavailable"
+                print(f"[Recorder] Audio unavailable: {exc}")
+        if self.playback:
             origin = time.perf_counter()
             epoch = time.time()
             cmd += ["-copyts"]
@@ -212,7 +238,7 @@ class ScreenRecorder:
             ]
 
         # Audio device if enabled
-        if self.config.audio_device == "system":
+        if self.playback:
             if method != "gfxcapture":
                 cmd += ["-thread_queue_size", "8"]
             cmd += ["-probesize", "32", "-analyzeduration", "1", "-f", "s16le", "-ar", str(self.playback.rate),
@@ -222,8 +248,8 @@ class ScreenRecorder:
                 cmd += ["-af", f"atrim=start={trim},asetpts=PTS-STARTPTS"]
             elif self.config.audio_offset_ms > 0:
                 cmd += ["-af", f"adelay={self.config.audio_offset_ms}:all=1"]
-        elif self.config.audio_device and self.config.audio_device.lower() != "none":
-            cmd += ["-f", "dshow", "-i", f"audio={self.config.audio_device}"]
+        elif audio_device and audio_device.lower() != "none":
+            cmd += ["-f", "dshow", "-i", f"audio={audio_device}"]
 
         if self.playback and not gpu_capture:
             cmd += ["-vf", f"setpts=PTS-{epoch:.6f}/TB"]
@@ -232,7 +258,9 @@ class ScreenRecorder:
             cmd += ["-vf", filters]
 
         if self.playback:
-            cmd += ["-r", str(self.config.fps), "-fps_mode", "cfr"]
+            cmd += ["-r", str(fps), "-fps_mode", "cfr"]
+        elif fps != self.config.fps:
+            cmd += ["-r", str(fps)]
 
         if encoder != self.config.encoder:
             print(f"[Recorder] Using {encoder} for this display ({self.config.encoder} unavailable).")
@@ -256,10 +284,10 @@ class ScreenRecorder:
         else:
             cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-tune", "zerolatency", "-b:v", self.config.bitrate]
 
-        cmd += ["-g", str(self.config.fps * 2)]  # Match the rolling segment duration.
+        cmd += ["-g", str(fps * 2)]  # Match the rolling segment duration.
 
         # Audio encoder if audio included
-        if self.config.audio_device and self.config.audio_device.lower() != "none":
+        if audio_device and audio_device.lower() != "none":
             cmd += ["-c:a", "aac", "-b:a", "192k"]
 
         if self.config.stretch_to_widescreen:
@@ -292,25 +320,32 @@ class ScreenRecorder:
                 self.playback.close()
                 self.playback = None
             raise
-        if self.playback:
-            self.playback.start(self.process.stdin, origin)
-
-        time.sleep(0.5)
-        if self.process.poll() is not None:
+        try:
             if self.playback:
-                self.playback.close()
-                self.playback = None
+                self.playback.start(self.process.stdin, origin)
+            first_video = self.segment_dir / f"seg_{self.first_segment:06d}.ts"
+            deadline = time.monotonic() + 6
+            while self.process.poll() is None and time.monotonic() < deadline:
+                try:
+                    if first_video.stat().st_size > 0:
+                        break
+                except FileNotFoundError:
+                    pass
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("Capture did not produce a segment.")
+        except Exception as exc:
+            self.stop_recording()
             with (self.segment_dir / "capture-errors.log").open("rb") as errors:
                 errors.seek(max(0, errors.seek(0, 2) - 1024))
-                err = errors.read().decode(errors="replace")
-            print(f"[Recorder] Error: FFmpeg capture failed (exit {self.process.returncode}): {err[-300:]}")
-            return
+                err = errors.read().decode(errors="replace").strip()
+            raise RuntimeError(f"{exc} {err[-300:]}".strip()) from exc
+        self._video_profile = (encoder, filters, fps)
 
         if self.config.overlay_enabled and self.config.overlay_device:
             self._camera_stop.clear()
-            first_video = self.segment_dir / f"seg_{self.first_segment:06d}.ts"
             self._camera_thread = threading.Thread(
-                target=self._camera_session, args=(self.process, first_video, resume),
+                target=self._camera_session, args=(self.process, first_video, resume or bool(existing)),
                 name="GameplayWebcam", daemon=True)
             self._camera_thread.start()
 
