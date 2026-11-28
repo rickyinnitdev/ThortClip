@@ -4,6 +4,7 @@ import time
 import threading
 from pathlib import Path
 from typing import Callable, Optional
+from .support_log import log
 
 ROUND_ENDED_REGEX = re.compile(r"AShooterGameState::OnRoundEnded for round '(\d+)'")
 MATCH_STARTED_REGEX = re.compile(r"LogShooterGameState: (?:Replicated NetServerMaxTickRate|Warning: Gameplay started at)")
@@ -85,6 +86,7 @@ class LogWatcher:
                 time.sleep(1)
             except Exception as error:
                 if self._running:
+                    log.exception("Could not process the Valorant log")
                     print(f"[LogWatcher] {error}")
                 time.sleep(1)
 

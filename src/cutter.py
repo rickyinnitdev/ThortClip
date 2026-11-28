@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 
 from .camera_manager import get_ffmpeg_binary
+from .support_log import log
 
 class VideoCutter:
     """Concatenates completed .ts segments into a pristine .mp4 clip with optional webcam overlay."""
@@ -164,6 +165,7 @@ class VideoCutter:
             else:
                 # If overlay cut failed, fall back to stream-copy
                 if use_overlay:
+                    log.warning("Webcam overlay export failed: %s", res.stderr.decode(errors="replace")[-600:])
                     print(f"[Cutter] Overlay cut failed ({res.stderr.decode(errors='ignore')[-150:]}), falling back to stream copy...")
                     cmd_fallback = [
                         binary, "-y", "-f", "concat", "-safe", "0",
@@ -178,9 +180,11 @@ class VideoCutter:
                         print(f"[Cutter] Saved fallback clip in {time.time()-start_t:.2f}s -> {output_path.name}")
                         return output_path
                 err_snippet = res.stderr.decode(errors="ignore")[-200:]
+                log.error("Clip export failed: %s", err_snippet)
                 print(f"[Cutter] Concat failed: {err_snippet}")
                 return None
         except Exception as e:
+            log.exception("Clip export failed")
             print(f"[Cutter] Error cutting clip: {e}")
             return None
         finally:

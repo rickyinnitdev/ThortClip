@@ -28,6 +28,7 @@ from .clip_player import read_markers, show_clip_in_folder
 from .launcher_job import contain_launcher
 from .main import ThortClipApp
 from .thumbnail_cache import ThumbnailManager
+from . import support_log
 
 # Modern Medal.tv Dark Palette
 RED = "#ff4d4f"
@@ -263,6 +264,12 @@ class RecorderWindow:
             activeforeground=palette.TEXT, font=("Segoe UI", 9, "bold"),
         )
         self.check_button.pack(fill="x", padx=10, pady=2)
+        error_button = RoundedButton(
+            self.sidebar, text="Error log…", command=self.show_error_log,
+            fg=palette.TEXT, bg=palette.CARD_BG, activebackground=palette.CARD_HOVER,
+            activeforeground=palette.TEXT, font=("Segoe UI", 9, "bold"),
+        )
+        error_button.pack(fill="x", padx=10, pady=2)
 
         # Spacer to push storage to bottom
         spacer = tk.Frame(self.sidebar, bg=palette.CARD_BG)
@@ -1628,6 +1635,7 @@ class RecorderWindow:
                 self.app.manual_start_recording()
                 result = "Recording started." if self.app.recorder.is_recording() else "Capture failed. Check encoder settings."
             except Exception as exc:
+                support_log.log.exception("Could not start recording")
                 result = str(exc)
             self.events.put(("action_done", result))
 
@@ -1646,6 +1654,7 @@ class RecorderWindow:
                 self.app.manual_stop_recording()
                 result = "Recording stopped. Standby."
             except Exception as exc:
+                support_log.log.exception("Could not stop recording")
                 result = str(exc)
             self.events.put(("action_done", result))
 
@@ -1664,6 +1673,7 @@ class RecorderWindow:
                 path = self.app.manual_save_clip(source="window")
                 result = f"Saved {path.name}" if path else "No clip saved. Check buffer and try again."
             except Exception as exc:
+                support_log.log.exception("Could not save clip")
                 result = str(exc)
             self.events.put(("action_done", result))
 
@@ -1816,6 +1826,39 @@ class RecorderWindow:
         delay = 1000 if self.root.state() == "normal" else 5000
         self.root.after(delay, self.refresh)
 
+    def show_error_log(self):
+        try:
+            report = support_log.recent_errors()
+        except OSError as exc:
+            messagebox.showerror("Error log", str(exc), parent=self.root)
+            return
+
+        dialog = tk.Toplevel(self.root, bg=palette.CARD_BG)
+        dialog.title("ThortClip error log")
+        dialog.transient(self.root)
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        tk.Label(dialog, text="Review the log before sharing it with support.",
+                 bg=palette.CARD_BG, fg=palette.TEXT).pack(anchor="w", padx=12, pady=8)
+        body = tk.Frame(dialog, bg=palette.CARD_BG)
+        body.pack(fill="both", expand=True, padx=12)
+        view = tk.Text(body, width=65, height=14, wrap="word", bg=palette.FIELD, fg=palette.TEXT)
+        scrollbar = ttk.Scrollbar(body, command=view.yview)
+        view.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        view.pack(side="left", fill="both", expand=True)
+        view.insert("1.0", report or "No errors have been recorded yet.")
+        view.configure(state="disabled")
+        copy = ttk.Button(dialog, text="Copy error log")
+
+        def copy_report():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(report)
+            copy.configure(text="Copied")
+
+        copy.configure(command=copy_report, state="normal" if report else "disabled")
+        copy.pack(anchor="e", padx=12, pady=8)
+        view.focus_set()
+
     def check_update(self, manual=False, *, startup=False):
         from .updates import stage_update
         bundle = os.environ.get("THORTCLIP_BUNDLE_TOOLS")
@@ -1844,6 +1887,7 @@ class RecorderWindow:
                                     Path(os.environ["LOCALAPPDATA"]) / "ThortClip" / "updates")
                 self.events.put(("update_checked", path, ""))
             except Exception as exc:
+                support_log.log.exception("Update check or download failed")
                 self.events.put(("update_checked", None, f"Could not check or download the update. {exc}"))
 
         threading.Thread(target=work, daemon=True).start()
@@ -1880,6 +1924,7 @@ class RecorderWindow:
             subprocess.Popen([str(self.pending_update), "/update", str(os.getpid())],
                              creationflags=subprocess.CREATE_BREAKAWAY_FROM_JOB)
         except OSError as exc:
+            support_log.log.exception("Could not launch the installer")
             messagebox.showerror("Update", str(exc), parent=self.root)
             return False
         return True
@@ -1896,13 +1941,17 @@ class RecorderWindow:
 
 
 def main():
+    support_log.start()
     root = tk.Tk()
+    root.report_callback_exception = lambda kind, value, trace: support_log.log.error(
+        "Window action failed", exc_info=(kind, value, trace))
     try:
         contain_launcher()
         app = ThortClipApp()
         app.start_services()
         RecorderWindow(root, app)
     except Exception as exc:
+        support_log.log.exception("ThortClip startup failed")
         messagebox.showerror("ThortClip startup", str(exc), parent=root)
         root.destroy()
         return

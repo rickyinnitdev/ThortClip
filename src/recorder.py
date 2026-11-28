@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional, List
 from .config import Config
 from .webcam_recorder import WebcamRecorder
+from .support_log import log
 
 BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
 CREATE_NO_WINDOW = 0x08000000
@@ -210,6 +211,7 @@ class ScreenRecorder:
                     game_audio_enabled=self.config.game_audio_enabled,
                 )
             except (OSError, ValueError, LookupError) as exc:
+                log.warning("Recording audio unavailable: %s", exc)
                 audio_device = "none"
                 self.capture_status += " · Audio unavailable"
                 print(f"[Recorder] Audio unavailable: {exc}")
@@ -323,6 +325,9 @@ class ScreenRecorder:
         try:
             if self.playback:
                 self.playback.start(self.process.stdin, origin)
+                for warning in (self.playback.playback_warning, self.playback.mic_warning):
+                    if warning:
+                        log.warning("%s", warning)
             first_video = self.segment_dir / f"seg_{self.first_segment:06d}.ts"
             deadline = time.monotonic() + 6
             while self.process.poll() is None and time.monotonic() < deadline:

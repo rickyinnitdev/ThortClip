@@ -6,6 +6,7 @@ from PIL import Image
 from typing import Callable, Dict, Any, Optional
 from .base import KillSourceBase
 from ..config import Config
+from ..support_log import log
 
 try:
     import dxcam
@@ -167,6 +168,7 @@ class ScreenDetectionKillSource(KillSourceBase):
         interval = 1.0 / max(1, self.config.detector_poll_fps)
 
         if dxcam is None:
+            log.error("Automatic kill detection unavailable: DXcam is missing")
             print("[ScreenDetector] Error: dxcam is not available.")
             return
 
@@ -182,6 +184,7 @@ class ScreenDetectionKillSource(KillSourceBase):
             feed = LocalKillFeed()
             print(f"[ScreenDetector] Connected to DirectX GPU VRAM ({mon_w}x{mon_h}). ROI: {region}")
         except Exception as e:
+            log.exception("Could not start automatic kill detection")
             print(f"[ScreenDetector] Warning: Could not initialize DirectX duplication: {e}")
             return
 
